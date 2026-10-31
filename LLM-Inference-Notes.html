@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="zh-CN" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>LLM 推理系统学习笔记</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1f2328; --muted:#59636e; --accent:#0f6cbd; --border:#d1d9e0;
+  --code-bg:#f6f8fa; --q-bg:#fff8e5; --q-border:#d4a017; --badge-bg:#9a6700; --badge-fg:#ffffff;
+  --ex-bg:#f1f6fd; --ex-border:#0f6cbd; --mine-bg:#eef7ef; --mine-border:#2e7d32;
+  --tip-bg:#f6f8fa; --th-bg:#eef2f6;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#16181d; --fg:#e6e8eb; --muted:#9ea7b3; --accent:#6cb6ff; --border:#3a414b;
+    --code-bg:#1e232b; --q-bg:#2a2414; --q-border:#c69026; --badge-bg:#c69026; --badge-fg:#16181d;
+    --ex-bg:#17212f; --ex-border:#4f8fd8; --mine-bg:#15251a; --mine-border:#57ab5a;
+    --tip-bg:#1e232b; --th-bg:#222833;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC",system-ui,sans-serif;
+  line-height:1.75;font-size:16px}
+.wrap{max-width:880px;margin-inline:auto;padding:32px 20px 64px}
+header h1{font-size:1.9rem;line-height:1.3;margin:0 0 4px}
+header .sub{color:var(--muted);margin:0 0 16px}
+h2{font-size:1.45rem;line-height:1.35;margin:56px 0 12px;padding-block-end:6px;border-block-end:2px solid var(--border)}
+h3{font-size:1.15rem;margin:28px 0 8px}
+h4{font-size:1rem;margin:0 0 6px}
+p{margin:10px 0}
+a{color:var(--accent)}
+.lead{font-size:1.02rem}
+.muted{color:var(--muted)}
+.note{background:var(--tip-bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin:14px 0}
+.note ul{margin:6px 0;padding-inline-start:20px}
+nav.toc{border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin:18px 0}
+nav.toc ol{margin:6px 0;padding-inline-start:22px;columns:2;column-gap:28px}
+nav.toc li{break-inside:avoid}
+.q{display:block;background:var(--q-bg);border-inline-start:4px solid var(--q-border);border-radius:6px;
+  padding:8px 12px;margin:14px 0;font-size:.95rem}
+.badge{display:inline-block;background:var(--badge-bg);color:var(--badge-fg);border-radius:4px;
+  padding:0 7px;margin-inline-end:8px;font-size:.82rem;font-weight:600;white-space:nowrap}
+.jump{white-space:nowrap;font-size:.9rem}
+.ex{background:var(--ex-bg);border-inline-start:4px solid var(--ex-border);border-radius:6px;padding:4px 16px 8px;margin:22px 0}
+.ex h3{margin-block-start:12px}
+.jumpline{text-align:end;margin:4px 0}
+.tip{background:var(--tip-bg);border-radius:6px;padding:8px 12px}
+.mine{background:var(--mine-bg);border-inline-start:4px solid var(--mine-border);border-radius:6px;padding:8px 12px;margin:14px 0}
+pre.f{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;
+  overflow-x:auto;font-family:"Cascadia Mono",Consolas,"Sarasa Mono SC","Noto Sans Mono CJK SC",ui-monospace,monospace;
+  font-size:.86rem;line-height:1.6;margin:12px 0;white-space:pre}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:.92rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:start;vertical-align:top}
+th{background:var(--th-bg)}
+ul,ol{padding-inline-start:24px}
+li{margin:4px 0}
+.ans,.qa{border-block-end:1px dashed var(--border);padding-block-end:12px;margin-block-end:12px}
+.qa .qtext{color:var(--muted);margin-block-start:2px}
+.grp{margin-block-start:34px;color:var(--accent)}
+.back{text-align:end;font-size:.9rem;margin:6px 0 0}
+ul.reading li{margin:6px 0}
+.ts{display:inline-block;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:0 5px;margin-inline-start:4px;font-size:.72rem;font-weight:400;line-height:1.5;vertical-align:middle;white-space:nowrap}
+footer{color:var(--muted);font-size:.88rem;margin-block-start:48px;border-block-start:1px solid var(--border);padding-block-start:12px}
+@media (max-width:640px){ nav.toc ol{columns:1} .wrap{padding:20px 14px 48px} }
+@media print{
+  :root{--bg:#ffffff;--fg:#000000;--muted:#444444;--code-bg:#f6f6f6;--q-bg:#fff8e5;--ex-bg:#f1f6fd;--mine-bg:#eef7ef}
+  body{font-size:11pt}
+  .wrap{max-width:none;padding:0}
+  .jump,.back,.jumpline{display:none}
+  pre.f{white-space:pre-wrap;overflow:visible}
+  .q,.ex,.mine,pre.f,table,.qa{break-inside:avoid}
+  h2,h3{break-after:avoid}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>LLM 推理系统学习笔记</h1>
+<p class="sub">6 课 + 延伸：从单卡计算到生产集群，再到新架构 · 2026 年 10 月 27–29 日</p>
+<div class="note">
+<p><b>怎么读：</b></p>
+<ul>
+<li><span class="badge">问 4.2</span>黄色框是我当时的提问，嵌在提问时读到的位置；点“看解答 ↓”跳到文末的解答，解答末尾可以跳回来。标“（大意）”的提问是按记录整理的意思，不是原话。</li>
+<li>蓝色框是每课的思考题，点“看答案 ↓”跳到文末的答案；绿色框是我当时的作答与批改。</li>
+<li><span class="ts">时效</span> 标着它的数字和接口基于 2026 年 10 月的硬件、模型和软件版本，以后可能变化；第 7.5 节说明了哪些内容通用、哪些会过时。</li><li>文末依次是：思考题答案、提问解答、延伸阅读。</li>
+</ul>
+<p><b>全文默认条件：</b><span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span> H100 SXM 80 GB，BF16 峰值 989.4 TFLOPS（FP8 1,979 TFLOPS），显存带宽 3.35 TB/s，NVLink 约 450 GB/s，每卡一张 400 Gb/s 网卡（约 50 GB/s）。Llama-3.1-8B BF16 权重 16.06 GB、每 token KV 128 KiB；70B BF16 权重 141.2 GB、每 token KV 320 KiB。</p>
+<p class="muted">说明：第 0–4 课的正文按当时的讲解和记录重新整理，个别措辞与原对话不同；第 1、3 课的思考题原题没有保留，这里是复习版；第 2 课的题目数字据批改记录复原。第 7 节整理的是学完第 6 课之后的 5 个延伸提问。</p>
+</div>
+<nav class="toc" aria-label="目录"><b>目录</b><ol>
+<li><a href="#l0">第 0 课　全景</a></li>
+<li><a href="#l1">第 1 课　推理基础</a></li>
+<li><a href="#l2">第 2 课　推理引擎</a></li>
+<li><a href="#l3">第 3 课　单卡优化</a></li>
+<li><a href="#l4">第 4 课　分布式推理与 MoE</a></li>
+<li><a href="#l5">第 5 课　集群层</a></li>
+<li><a href="#l6">第 6 课　生产化</a></li><li><a href="#l7">第 7 节　新架构与新负载</a></li>
+<li><a href="#answers">思考题答案</a></li>
+<li><a href="#qa">提问解答</a></li>
+<li><a href="#reading">延伸阅读</a></li>
+</ol></nav>
+</header>
+<main>
+
+<section id="l0"><h2>第 0 课　全景：大型 LLM 推理系统由哪些部分组成</h2>
+<aside class="q" id="q-0-1"><span class="badge">问 0.1</span>「这个thread用于学习LLM推理系统。你先给我介绍一下一个大型LLM推理系统包含哪些组件，各自负责什么功能？」 <a class="jump" href="#a-0-1">看解答 ↓</a></aside>
+<p class="lead">一个请求从用户发出、到 token 一个个流回去，要依次经过下面这些组件。后面 6 课就是沿着这条路，从单个 GPU 一路讲到整个生产集群。</p>
+<pre class="f">客户端
+  ↓
+网关：鉴权、限流、计费、按租户隔离
+  ↓
+预处理：分词、套聊天模板、处理图片等多模态输入
+  ↓
+路由：选一个推理实例——既看负载，也看谁缓存了这个请求的前缀
+  ↓
+推理引擎：组 batch、管理 KV cache、在 GPU 上执行模型
+  ↕
+KV 传输与存储：prefill 与 decode 之间搬 KV；CPU 内存、SSD、远端池分层存放
+
+控制面（部署、扩缩容、模型版本）和可观测性（指标、日志、追踪）贯穿全程</pre>
+<table><thead><tr><th>组件</th><th>负责什么</th><th>详见</th></tr></thead><tbody>
+<tr><td>网关</td><td>鉴权、限流、计费、租户隔离</td><td>第 6 课</td></tr>
+<tr><td>预处理</td><td>分词、聊天模板、多模态输入</td><td>—</td></tr>
+<tr><td>路由</td><td>负载均衡、KV 感知路由</td><td>第 5 课</td></tr>
+<tr><td>推理引擎</td><td>调度、KV cache 管理、模型执行</td><td>第 1–4 课</td></tr>
+<tr><td>KV 传输与存储</td><td>P/D 之间传 KV、分层缓存</td><td>第 5 课</td></tr>
+<tr><td>控制面</td><td>部署、扩缩容、模型与版本管理</td><td>第 6 课</td></tr>
+<tr><td>可观测性</td><td>指标、日志、追踪</td><td>第 6 课</td></tr>
+</tbody></table>
+<h3>三个核心矛盾</h3>
+<ol>
+<li><b>吞吐与延迟</b>：batch 越大，GPU 用得越充分、越省钱，但每个请求等得越久。</li>
+<li><b>显存</b>：权重和 KV cache 抢同一块显存；上下文越长、并发越多，KV 越大。</li>
+<li><b>prefill 与 decode</b>：一个吃算力、一个吃带宽，放在一起会互相干扰。</li>
+</ol>
+<p>后面 6 课的各种技术，基本都是在这三个矛盾之间找平衡。</p>
+</section>
+
+<section id="l1"><h2>第 1 课　推理基础：prefill、decode、KV cache 与 roofline</h2>
+<p class="lead"><b>一句话：</b>一个请求分两个阶段。prefill 一次性处理整段 prompt，受<b>算力</b>限制，决定首 token 时间（TTFT）；decode 每次生成一个 token，每一步都要把全部权重和 KV 从显存读一遍，受<b>带宽</b>限制，决定 token 间延迟（ITL，也常写作 TPOT）。</p>
+<h3>KV cache：用显存换计算</h3>
+<p>生成下一个 token 时，要用到前面所有 token 在每一层的 K 和 V。把它们存下来，就不必每一步都重算整段上下文。代价是显存：</p>
+<pre class="f">每个 token 的 KV 字节数 = 2（K 和 V）× 层数 × KV head 数 × head_dim × 每个数的字节数
+
+Llama-3.1-8B（BF16）：  2 × 32 × 8 × 128 × 2 = 131,072 字节 = 128 KiB
+Llama-3.1-70B（BF16）： 2 × 80 × 8 × 128 × 2 = 327,680 字节 = 320 KiB
+8B 的一个 4K 上下文请求：4,096 × 128 KiB = 512 MiB ≈ 0.537 GB</pre>
+<p class="tip"><b>单位：</b>KiB、MiB、GiB 是 1024 进制；GB、GB/s、FLOP 是 1000 进制。先换成字节，再去除带宽。</p>
+<h3>Roofline：算力瓶颈还是带宽瓶颈</h3>
+<p>算术强度 = 计算量 ÷ 访存字节数。H100 的"屋脊点"是 989.4 TFLOPS ÷ 3.35 TB/s ≈ 295 FLOP/字节<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>：算术强度低于它就受带宽限制，高于它才受算力限制。</p>
+<aside class="q" id="q-1-1"><span class="badge">问 1.1</span>「decode 的算术强度为什么约等于 batch 大小 B？」<span class="muted">（大意）</span> <a class="jump" href="#a-1-1">看解答 ↓</a></aside>
+<pre class="f">一个 d × d 的线性层，这一步有 B 个 token（BF16，每个权重 2 字节）：
+  计算量 = 2 × B × d²   FLOP
+  读权重 = 2 × d²       字节
+  算术强度 ≈ B          FLOP/字节
+
+decode： B 是 batch 里的请求数，通常远小于 295 → 带宽瓶颈
+prefill：B 是 prompt 的 token 数（成百上千） → 算力瓶颈</pre>
+<h3>两个下限</h3>
+<pre class="f">decode 每步时间下限 ≈ (全部权重字节 + 这一步要读的全部 KV 字节) / 显存带宽
+prefill 时间下限    ≈ 2 × 参数量 × prompt 的 token 数 / 峰值算力
+
+8B，batch 1：           16.06 GB / 3.35 TB/s ≈ 4.79 ms
+8B，2,000 token 的 prompt：2 × 8.03e9 × 2,000 / 989.4e12 ≈ 32.5 ms
+8B，batch 64、每个 4K 上下文：
+  (16.06 + 64 × 0.537) GB / 3.35 TB/s ≈ 15.05 ms，每秒合计约 4,252 个 token</pre>
+<ul>
+<li>batch 越大，同一次读权重分摊给越多请求，总吞吐越高；但 KV 也随 batch 线性增长，最终会先撞上显存容量或 ITL 目标。</li>
+<li>这就是第 0 课"吞吐与延迟""显存"两个矛盾的根源。</li>
+</ul>
+<aside class="q" id="q-1-2"><span class="badge">问 1.2</span>「有没有把模型权重直接做进芯片、绕开显存带宽瓶颈的推理芯片？」<span class="muted">（大意）</span> <a class="jump" href="#a-1-2">看解答 ↓</a></aside>
+<div class="ex" id="ex-1"><h3>思考题（复习版）</h3>
+<p class="muted">原题没有保留，以下按当时的讲解和批改要点整理。</p>
+<p>条件：Llama-3.1-8B BF16，单张 H100（80 GB），32 个请求同时 decode，每个请求的上下文是 4K token。</p>
+<ol type="a">
+<li>每个请求的 KV 多大？</li>
+<li>每一步 decode 要从显存读多少字节？每步时间下限是多少？每秒总共能生成多少个 token？</li>
+<li>这一步是算力瓶颈还是带宽瓶颈？</li>
+<li>显存按 90% 可用、扣掉权重，最多能同时放下多少个 4K 上下文的请求？</li>
+</ol>
+<p class="jumpline"><a class="jump" href="#ans-1">看答案 ↓</a></p></div>
+</section>
+
+<section id="l2"><h2>第 2 课　推理引擎：continuous batching、PagedAttention 与前缀缓存</h2>
+<p class="lead"><b>一句话：</b>引擎每一步都重新组 batch（continuous batching），用分页的方式管理 KV 显存（PagedAttention），并让前缀相同的请求共享 KV（前缀缓存）。</p>
+<h3>Continuous batching</h3>
+<p>早期按"请求"组 batch：一批里先结束的也得等全批跑完，新请求要等下一批。Orca 提出按"迭代"调度：每生成一个 token 就重新决定 batch 里有谁，结束的马上离开，新来的马上加入。</p>
+<aside class="q" id="q-2-1"><span class="badge">问 2.1</span>「为什么一个请求在做 prefill，会让同一批里别人的 decode 变慢？」<span class="muted">（大意）</span> <a class="jump" href="#a-2-1">看解答 ↓</a></aside>
+<pre class="f">每一步是一个同步点：batch 里所有请求都算完这一步，大家才拿到下一个 token
+
+8B，100 个请求（每个约 2K 上下文）纯 decode：      每步约 12.81 ms
+同一步里插进一整段 32K token 的 prefill：            这一步约 0.82 秒
+chunked prefill（长 prompt 切块，与 decode 拼进同一步）：每步约 34–65 ms</pre>
+<p>chunked prefill（SARATHI）把长 prompt 切成多块，与 decode 混在同一步里跑：块越小，ITL 越稳，但 TTFT 越长。第 5 课的 P/D 分离是另一种解法。</p>
+<h3>PagedAttention</h3>
+<ul>
+<li>像操作系统的虚拟内存分页：KV 存放在固定大小的块（block，常见 16 个 token）里，每个请求用一张"块表"把逻辑位置映射到物理块。用多少分配多少，几乎没有碎片。</li>
+<li>8B 的一个 16 token 块：16 × 128 KiB = 2 MiB。</li>
+<li>vLLM 论文报告：在相同延迟下，吞吐比 FasterTransformer 和 Orca 高 2–4 倍。</li>
+</ul>
+<h3>前缀缓存</h3>
+<ul>
+<li>每个块按"前面所有 token + 本块 token（再加上 LoRA、多模态、cache_salt 等额外信息）"算哈希，哈希相同就复用同一块物理 KV。</li>
+<li>只能共享内容完全相同的<b>整块</b>。</li>
+</ul>
+<aside class="q" id="q-2-2"><span class="badge">问 2.2</span>「为什么不同请求不能共享同一个没写满的 block？」<span class="muted">（大意）</span> <a class="jump" href="#a-2-2">看解答 ↓</a></aside>
+<aside class="q" id="q-2-3"><span class="badge">问 2.3</span>「cache_salt 的作用范围是什么？应该由谁来设置？」<span class="muted">（大意）</span> <a class="jump" href="#a-2-3">看解答 ↓</a></aside>
+<h3>抢占</h3>
+<p>显存不够时，调度器会把一些请求踢回等待队列；vLLM V1 默认丢掉它们的 KV，之后重算<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>。抢占不会报错，只会让一部分请求的尾延迟变差，所以要监控抢占次数（第 6 课）。</p>
+<div class="ex" id="ex-2"><h3>思考题</h3>
+<p class="muted">题目数字据当时的批改记录复原。</p>
+<p>条件：Llama-3.1-8B BF16，block 大小 16 token（每块 2 MiB）。300 个请求同时在跑，每个请求 1,500 token，其中前 1,000 token 是同一段 system prompt。</p>
+<ol type="a">
+<li>不共享时，一共需要多少个 block、多少显存？</li>
+<li>开启前缀缓存后，每个请求能共享多少个 block？一共省下多少显存？</li>
+<li>为什么 system prompt 的最后那半个 block 不能共享？</li>
+</ol>
+<p class="jumpline"><a class="jump" href="#ans-2">看答案 ↓</a></p></div>
+</section>
+
+<section id="l3"><h2>第 3 课　单卡优化：FlashAttention、量化、CUDA Graph 与投机解码</h2>
+<p class="lead"><b>一句话：</b>四种优化各对付一个瓶颈：FlashAttention 减少 attention 的显存读写；量化减少要搬的字节；CUDA Graph 去掉 CPU 发射 kernel 的开销；投机解码让一次读权重产出多个 token。</p>
+<h3>FlashAttention</h3>
+<p>普通实现会把 N × N 的注意力分数矩阵写回显存、再读出来，长序列时这部分读写就是瓶颈。FlashAttention 把 Q、K、V 切块放进片上 SRAM，边算边做 softmax，不把这个大矩阵落到显存；计算量不变，结果完全精确。</p>
+<aside class="q" id="q-3-1"><span class="badge">问 3.1</span>「分块计算 softmax，为什么结果和整行一起算完全一样？」<span class="muted">（大意）</span> <a class="jump" href="#a-3-1">看解答 ↓</a></aside>
+<pre class="f">把一行分数分成两块，分别算出：
+  块 1：最大值 m1，指数和 l1 = Σ exp(s − m1)，按块内 softmax 加权的输出 o1
+  块 2：最大值 m2，指数和 l2，输出 o2
+合并：
+  m = max(m1, m2)
+  l = exp(m1 − m) · l1 + exp(m2 − m) · l2
+  o = [exp(m1 − m) · l1 · o1 + exp(m2 − m) · l2 · o2] / l
+与一次性对整行做 softmax 的结果完全相等</pre>
+<h3>量化</h3>
+<ul>
+<li><b>权重量化</b>（FP8、INT4）：decode 受带宽限制，要搬的字节减半，时间就近似减半。</li>
+</ul>
+<pre class="f">8B，batch 1 的 decode 每步下限：
+  BF16：16.06 GB → 4.79 ms
+  FP8：  8.03 GB → 2.40 ms
+  INT4：约 4 GB  → 1.20 ms（不计缩放系数）</pre>
+<ul>
+<li><b>计算也用 FP8</b>时，H100 峰值从 989.4 翻倍到 1,979 TFLOPS，prefill 才会明显变快；只量化权重、计算仍用 BF16，对 prefill 帮助不大。</li>
+<li><b>KV cache 量化</b>（如 FP8）：KV 减半，能放下更多并发，每步读得也更快。</li>
+<li>代价是精度可能下降，要用评测验证。</li>
+</ul>
+<h3>CUDA Graph</h3>
+<p>decode 一步要发射几百个小 kernel。batch 小、每步只有几毫秒时，CPU 一个个发射 kernel 的开销占比可观。CUDA Graph 把整步的 kernel 序列录制一次，之后整体重放，省掉这部分开销。限制是形状要固定，所以引擎会按几种常见的 batch 大小分别录制。</p>
+<h3>投机解码</h3>
+<p>先用一个小的草稿模型猜 k 个 token，再让大模型一次前向同时验证。decode 受带宽限制，验证 k 个和生成 1 个的耗时差不多，所以猜中越多越赚；配合拒绝采样，输出分布与原模型完全一致。</p>
+<pre class="f">每个草稿 token 被接受的概率为 α，一次猜 k 个：
+  每步期望产出的 token 数 = 1 + α + α<sup>2</sup> + … + α<sup>k</sup>
+                          = (1 − α<sup>k+1</sup>) / (1 − α)
+例：α = 0.8，k = 4 → 约 3.36 个</pre>
+<aside class="q" id="q-3-2"><span class="badge">问 3.2</span>「speculative decoding的公式推导格式不对，没有正确展示；第三步“等比数列求和”这一段显示不完全」 <a class="jump" href="#a-3-2">看解答 ↓</a></aside>
+<div class="ex" id="ex-3"><h3>思考题（复习版）</h3>
+<p class="muted">原题没有保留，以下按当时的讲解要点整理。</p>
+<ol>
+<li>FlashAttention 的计算量和普通 attention 一样，为什么还能更快？</li>
+<li>8B 的权重从 BF16 换成 FP8、INT4，batch 1 的 decode 每步下限分别是多少？为什么只量化权重，对 prefill 帮助不大？</li>
+<li>投机解码：每个草稿 token 的接受率 α = 0.8，一次猜 k = 4 个。
+<ol type="a">
+<li>每步期望产出多少个 token？</li>
+<li>如果大模型验证一步的耗时和普通 decode 一步相同，草稿模型每猜一个 token 的耗时是大模型一步的 10%，理论加速比是多少？</li>
+<li>α 降到 0.6 呢？</li>
+</ol></li>
+</ol>
+<p class="jumpline"><a class="jump" href="#ans-3">看答案 ↓</a></p></div>
+</section>
+
+<section id="l4"><h2>第 4 课　分布式推理与 MoE：DP、TP、PP、EP</h2>
+<p class="lead"><b>一句话：</b>模型一张卡放不下，或者单卡跑得太慢，就要切到多张卡上。四种切法的区别在于"切什么"和"每一步要通信什么"；通信越频繁、量越大的切法，越要放在越快的互联上。</p>
+<aside class="q" id="q-4-1"><span class="badge">问 4.1</span>「DP/TP/PP/EP是什么的缩写？」 <a class="jump" href="#a-4-1">看解答 ↓</a></aside>
+<table><thead><tr><th>切法</th><th>切什么</th><th>每一步通信什么</th><th>一般放在哪</th></tr></thead><tbody>
+<tr><td>DP（数据并行）</td><td>整个模型复制多份，各自处理不同请求</td><td>几乎不通信</td><td>任意位置</td></tr>
+<tr><td>TP（张量并行）</td><td>每一层的矩阵切到多张卡</td><td>每层 2 次 all-reduce</td><td>机内（NVLink）</td></tr>
+<tr><td>PP（流水线并行）</td><td>按层切成几段，像流水线一样接力</td><td>段与段之间传激活</td><td>可以跨机</td></tr>
+<tr><td>EP（专家并行）</td><td>MoE 的不同专家放到不同卡</td><td>每个 MoE 层 2 次 all-to-all</td><td>机内 + 跨机高速网络</td></tr>
+</tbody></table>
+<h3>为什么要切</h3>
+<ul>
+<li><b>放不下</b>：70B 的 BF16 权重有 141.2 GB，一张 80 GB 的卡装不下。</li>
+<li><b>太慢</b>：decode 每步的下限约等于"每张卡要读的权重字节 ÷ 带宽"。</li>
+</ul>
+<pre class="f">70B BF16 放在一张（假想的）足够大的卡上：141.2 GB / 3.35 TB/s ≈ 42.1 ms
+TP=8，每张卡只读 1/8：                   17.65 GB / 3.35 TB/s ≈ 5.27 ms</pre>
+<aside class="q" id="q-4-2"><span class="badge">问 4.2</span>「抱歉，帮我回想一下这个细节。prefill阶段算力是瓶颈，所以TTFT的下限大概是2*k*d*d*权重精度字节数/算力。（K维度是k*d, V维度是d*d）decode阶段显存带宽是瓶颈，TPOT的下限应该等于生成一个token所需的显存/带宽。为什么是用权重字节数作为被除数呢？权重不是只需要load一次吗？」 <a class="jump" href="#a-4-2">看解答 ↓</a></aside>
+<h3>一层里有什么</h3>
+<aside class="q" id="q-4-3"><span class="badge">问 4.3</span>「解释一下TP里的每一层是指什么？以transformer based模型为例，每一层对应softmax（Q*K*缩放）*Vt的哪一个？」 <a class="jump" href="#a-4-3">看解答 ↓</a></aside>
+<pre class="f">一个 Transformer 层（Llama 结构）：
+  h = x + Attention(RMSNorm(x))      ← 注意力块 + 残差
+  y = h + MLP(RMSNorm(h))            ← MLP 块 + 残差
+
+Attention：Q = xW_Q，K = xW_K，V = xW_V
+           每个 head 各自算 softmax(QKᵀ / √d_head) · V
+           各 head 的结果拼起来，再乘 W_O（输出投影）
+MLP（SwiGLU）：(SiLU(xW_gate) ⊙ xW_up) · W_down</pre>
+<aside class="q" id="q-4-5"><span class="badge">问 4.5</span>「哦所以attention特指QKV的计算，然后一层包含attention以及一个全连接网络（就是那个升维激活降维）？」 <a class="jump" href="#a-4-5">看解答 ↓</a></aside>
+<aside class="q" id="q-4-6"><span class="badge">问 4.6</span>「RMSnorm、输出投影、残差、Wgate是干嘛的？」 <a class="jump" href="#a-4-6">看解答 ↓</a></aside>
+<h3>TP：把每一层切开（Megatron-LM）</h3>
+<pre class="f">MLP 的 TP 切法（n 张卡）：
+  W_up 按列切成 n 份，W_down 按行切成 n 份，第 b 份放在第 b 张卡
+  Y = act(X · W_up) · W_down
+    = act(X · W_up_1) · W_down_1 + … + act(X · W_up_n) · W_down_n
+  每张卡只算自己那一项，最后 all-reduce 求和
+Attention 同理：按 head 切，每张卡负责一部分 query head 和对应的 KV head</pre>
+<aside class="q" id="q-4-7"><span class="badge">问 4.7</span>「详细解释这个公式的每一个符号」 <a class="jump" href="#a-4-7">看解答 ↓</a></aside>
+<aside class="q" id="q-4-4"><span class="badge">问 4.4</span>「理论上每一层的输入应该是上一层完整的输出对吗？那在TP里是不是每个GPU都要先算完第i层的部分输出，然后所有gpu的输出汇总成完整的输出，再执行下一层？」 <a class="jump" href="#a-4-4">看解答 ↓</a></aside>
+<p>每层要做两次 all-reduce：attention 的输出投影之后一次，MLP 的 W_down 之后一次。70B 有 80 层，每步就是 160 次；按每次约 10 µs 算，约 1.6 ms。这就是 TP 要放在 NVLink 这种机内高速互联上的原因。</p>
+<h3>GQA</h3>
+<aside class="q" id="q-4-8"><span class="badge">问 4.8</span>「GQA是什么」 <a class="jump" href="#a-4-8">看解答 ↓</a></aside>
+<p>多个 query head 共用一组 K、V。Llama-3.1-8B 有 32 个 query head、8 个 KV head；70B 有 64 个 query head、8 个 KV head。KV 大小因此分别降到原来的 1/4 和 1/8。TP=8 时，正好每张卡分到 1 个 KV head。</p>
+<h3>PP</h3>
+<p>按层切成几段。单个请求要依次走完所有段，所以 batch 1 的延迟不会降低；但多个微批可以同时在不同段上跑，吞吐能接近 TP。通信只在段与段之间传激活，量小，适合跨机。</p>
+<h3>MoE 与 EP</h3>
+<aside class="q" id="q-4-9"><span class="badge">问 4.9</span>「EP没太看懂，重讲一次」 <a class="jump" href="#a-4-9">看解答 ↓</a></aside>
+<ul>
+<li><b>MoE</b>：每层有很多个"专家" MLP，每个 token 只选其中几个（top-k）。DeepSeek-V3 总参数 671B，每个 token 只激活 37B。</li>
+<li><b>每个专家只分到 batch 的一小部分</b>：平均是 batch 的 k/E。Mixtral 风格（8 选 2）是 1/4，DeepSeek-V3（256 选 8）是 1/32。专家要分到约 295 个 token（H100 的屋脊点）<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>才不受带宽限制，所以细粒度 MoE 需要非常大的 batch。</li>
+<li><b>EP</b>：把专家分散到很多张卡上，每张卡上的专家收集所有卡送来的 token，才凑得够 batch。每个 MoE 层两次 all-to-all：先把 token 分发到专家所在的卡，算完再送回来合并。</li>
+<li><b>DeepSeek 的线上部署</b>：prefill 单元用 4 台机器（EP32），decode 单元用 18 台（EP144）。</li>
+</ul>
+<aside class="q" id="q-4-10"><span class="badge">问 4.10</span>「这下看懂了，那卡间通信、机间通信是谁实现的？推理引擎吗」 <a class="jump" href="#a-4-10">看解答 ↓</a></aside>
+<div class="ex" id="ex-4"><h3>思考题</h3>
+<ol>
+<li>Llama-3.1-405B FP8（126 层，8 个 KV head，head_dim 128），用一台 8×H100 跑 TP=8：
+<ol type="a">
+<li>每张卡的权重是多少 GB？每个 token 的 KV 在每张卡上是多少 KiB？</li>
+<li>batch 1 时 TPOT 的下限是多少（只算权重）？</li>
+<li>每步要做多少次 all-reduce？按每次 10 µs 算，通信时间占读权重时间的多少？</li>
+</ol></li>
+<li>同一个模型改用 PP=8（每张卡放 1/8 的层）：
+<ol type="a">
+<li>batch 1 时 TPOT 的下限是多少？</li>
+<li>为什么吞吐仍可能接近 TP=8？需要满足什么条件？</li>
+<li>什么情况下你会选 PP 而不是 TP？</li>
+</ol></li>
+<li>把 Mixtral 风格的 MoE（8 个专家，每个 token 选 2 个）和 DeepSeek-V3（256 个专家选 8 个）对比：
+<ol type="a">
+<li>每个专家平均分到的 token 数，分别是 batch 的几分之一？</li>
+<li>要让每个专家分到约 295 个 token，各需要多大的 batch？</li>
+<li>为什么细粒度 MoE 更依赖大规模 EP？</li>
+</ol></li>
+</ol>
+<p class="jumpline"><a class="jump" href="#ans-4">看答案 ↓</a></p></div>
+</section>
+
+<section id="l5"><h2>第 5 课　集群层：KV 感知路由、P/D 分离与分布式 KV cache</h2>
+<p class="lead"><b>一句话：</b>到了集群层，问题变成三件事：请求发给哪个实例（KV 感知路由），prefill 和 decode 要不要分开部署（P/D 分离），KV 存在哪里、能不能跨实例复用（分布式 KV cache）。三件事都围绕 KV cache 展开——Mooncake 就把自己的架构称为"以 KV cache 为中心"。</p>
+<pre class="f">用户请求
+  ↓
+Gateway：鉴权、限流
+  ↓
+Router：查全局 KV 索引，选一个"命中多、又不太忙"的 prefill 实例，
+        再选一个显存有余量的 decode 实例
+  ↓
+Prefill 实例：
+  命中 GPU 前缀缓存的部分：直接复用
+  命中 CPU 内存、SSD 或远端 KV 池的部分：加载回 GPU（比重算快）
+  剩下的部分：计算；每算完一层，就把这一层的 KV 通过 RDMA 发给 decode 实例
+  ↓
+Decode 实例：收到 KV 后加入 continuous batching，逐个生成 token，流式返回
+  ↓
+请求结束：KV 留在缓存里，或写入分层存储，供下一轮对话复用</pre>
+<h3>KV 感知路由</h3>
+<ul>
+<li><b>请求是有状态的</b>：发给缓存了它前缀的实例，就能跳过这部分 prefill。</li>
+<li><b>影响集群的有效缓存容量</b>：随机分配时，每个实例都得缓存所有热门前缀，有效缓存只相当于一个实例；按缓存路由时，有效容量接近所有实例之和。</li>
+<li><b>路由器怎么知道谁缓存了什么</b>：近似做法按自己发出过的请求，为每个实例维护一棵前缀树（如 SGLang）；精确做法由引擎上报 KV 事件，汇总成全局索引（如 Dynamo、llm-d）。</li>
+<li><b>命中和负载要一起看</b>，Dynamo 的代价函数<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>：</li>
+</ul>
+<pre class="f">prefill 项 = 积压 + 新请求的输入 − 新请求的缓存命中（都按块数计）
+  积压：已经派到这个实例、还没出第一个 token 的请求，它们还要算的 prompt token
+decode 项  = 这个实例上所有活跃请求占用的 KV 块数 + 新请求将要占用的块数
+cost = 权重 × prefill 项 + decode 项，选 cost 最小的实例
+
+例（请求共 10 块，权重 1.0）：
+  实例 1：积压 0， 命中 2，decode 10 → (0 + 10 − 2) + 10 = 18
+  实例 2：积压 12，命中 5，decode 5  → (12 + 10 − 5) + 5 = 22
+  实例 3：积压 0， 命中 8，decode 9  → (0 + 10 − 8) + 9  = 11  ← 选中</pre>
+<aside class="q" id="q-5-1"><span class="badge">问 5.1</span>「这个dynamo的算法为何只考虑decode的负载？prefill的负载不用考虑吗？」 <a class="jump" href="#a-5-1">看解答 ↓</a></aside>
+<p>模拟（4 个实例，每个缓存 4 万 token；300 个对话、每个 4 轮；70% 的对话共用同一段 system prompt）：</p>
+<table><thead><tr><th>路由策略</th><th>命中率</th><th>平均排队（token）</th><th>最忙实例 / 平均</th></tr></thead><tbody>
+<tr><td>随机</td><td>58.2%</td><td>99,575</td><td>1.06</td></tr>
+<tr><td>轮询</td><td>58.6%</td><td>98,514</td><td>1.03</td></tr>
+<tr><td>只看缓存</td><td>75.8%</td><td>183,243</td><td>2.96</td></tr>
+<tr><td>缓存 + 负载</td><td>77.5%</td><td>652</td><td>1.03</td></tr>
+</tbody></table>
+<ul>
+<li>"只看缓存"把共用热门 system prompt 的请求全压到一个实例上，排队反而最长。</li>
+<li>"缓存 + 负载"命中率最高、排队最短：请求分散后 4 个实例的缓存都用上了，热门前缀也被自然复制到多个实例。</li>
+<li><b>安全</b>：缓存键要包含模型版本、LoRA adapter、多模态哈希和租户 salt；路由器的全局索引也要按租户隔离，否则第 2 课的计时侧信道在集群层同样存在。</li>
+</ul>
+<h3>P/D 分离</h3>
+<ul>
+<li><b>为什么</b>：两个阶段会互相干扰（第 2 课的数字）；需要的资源不同，prefill 吃算力、decode 吃带宽和 KV 显存；硬件也可以不同（Splitwise）。</li>
+</ul>
+<pre class="f">1. Router 选一对实例：prefill 实例 P、decode 实例 D
+2. P 做 prefill，算出第一个 token
+3. P 把这个请求的 KV 发给 D（可以算完一层发一层）
+4. D 把请求加入自己的 decode batch，继续生成，流式返回</pre>
+<p>KV 传输贵不贵（每张卡一张 400 Gb/s 网卡，约 50 GB/s；TP=8 时 8 张卡并行发）：</p>
+<table><thead><tr><th>场景</th><th>本次 prefill 产生的 KV</th><th>传输时间</th><th>prefill 计算时间</th></tr></thead><tbody>
+<tr><td>70B，TP=8，4K prompt</td><td>1.34 GB（每卡 168 MB）</td><td>3.4 ms</td><td>76 ms</td></tr>
+<tr><td>70B，TP=8，32K prompt</td><td>10.74 GB（每卡 1.34 GB）</td><td>26.8 ms</td><td>762 ms</td></tr>
+<tr><td>8B，单卡，4K prompt</td><td>0.54 GB</td><td>10.7 ms</td><td>71 ms</td></tr>
+<tr><td>8B，单卡，32K prompt</td><td>4.29 GB</td><td>85.9 ms</td><td>816 ms</td></tr>
+</tbody></table>
+<pre class="f">传输时间 / 计算时间 ≈ 每 token 传输时间 / 每 token 计算时间
+  70B，TP=8：0.82 µs / 17.8 µs ≈ 4.6%
+  8B，单卡： 2.62 µs / 16.2 µs ≈ 16%</pre>
+<p>而且传输能和计算重叠：prefill 算完一层就发一层，大部分传输时间都能藏在计算后面。</p>
+<aside class="q" id="q-5-2"><span class="badge">问 5.2</span>「算完一层是什么意思？」 <a class="jump" href="#a-5-2">看解答 ↓</a></aside>
+<ul>
+<li><b>什么时候值得分</b>：vLLM 文档的说法是，P/D 分离可以分别调优 TTFT 和 ITL、控制 ITL 的尾部，但它本身不提升吞吐。论文报告的收益体现在 goodput（满足 SLO 前提下的最大请求速率）：DistServe 可以多服务 7.4 倍的请求，或把 SLO 收紧 12.6 倍；Splitwise 在成本降低 20% 时吞吐提升 1.4 倍，或在同功耗、同成本下吞吐提升 2.35 倍；Mooncake 让 Kimi 多处理了 75% 的请求。</li>
+<li>规模不大、prompt 不长、延迟要求宽松时，chunked prefill 就够了。</li>
+</ul>
+<h3>分布式 KV cache</h3>
+<pre class="f">GPU 显存（HBM）  每卡约 80 GB          最快，但最小
+CPU 内存         每台服务器 TB 级       经 PCIe 搬回 GPU
+本地 SSD         DGX H100 自带约 30 TB  更大，更慢
+远端 KV 池       整个集群共享           经 RDMA 读取，任何实例都能用</pre>
+<p>加载还是重算？以 Llama-3.1-70B（TP=8）、20K 的对话历史为例，KV 一共 6.71 GB，每张卡 0.84 GB：</p>
+<table><thead><tr><th>来源</th><th>每卡带宽（假设）</th><th>恢复这段历史的耗时</th></tr></thead><tbody>
+<tr><td>重算 prefill</td><td>—</td><td>约 435 ms</td></tr>
+<tr><td>CPU 内存（经 PCIe）</td><td>50 GB/s</td><td>约 17 ms，快约 26 倍</td></tr>
+<tr><td>远端 KV 池（RDMA）</td><td>50 GB/s</td><td>约 17 ms，另加网络往返延迟</td></tr>
+<tr><td>本地 SSD</td><td>5 GB/s</td><td>约 168 ms，快约 2.6 倍</td></tr>
+</tbody></table>
+<aside class="q" id="q-5-3"><span class="badge">问 5.3</span>「RDMA就是GPU直接读网卡？怎么比SSD快这么多？GPU不能直接读SSD吗？」 <a class="jump" href="#a-5-3">看解答 ↓</a></aside>
+<pre class="f">值不值得加载，看"每读 1 字节 KV 能省下多少计算"：
+  每 token 的计算量 ≈ 2 × 参数量（长上下文还要加上 attention）
+  Llama-3.1-70B：2 × 70.6B / 327,680 字节 ≈ 430,908 FLOP/字节
+这个比值越大、上下文越长，越值得"加载"而不是"重算"</pre>
+<ul>
+<li><b>线上数据</b>：DeepSeek 一天的 6,080 亿输入 token 里，有 3,420 亿（56.3%）命中了磁盘上的 KV cache（底层是 3FS）。DeepSeek-R1 命中缓存的输入每百万 token 0.14 美元，未命中 0.55 美元<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>。</li>
+<li><b>安全</b>：KV 是用户 prompt 的派生数据，落到 CPU 内存、SSD 或远端池时，要按租户隔离缓存键、做访问控制、落盘加密，过期策略要和数据保留承诺一致。</li>
+</ul>
+<h3>业界系统一览<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span></h3>
+<table><thead><tr><th>系统</th><th>出自</th><th>做了什么</th></tr></thead><tbody>
+<tr><td>DistServe</td><td>北大、UCSD 等（OSDI 2024）</td><td>P/D 分离；按 TTFT、TPOT 分别优化两个池，目标是 goodput</td></tr>
+<tr><td>Splitwise</td><td>微软（ISCA 2024）</td><td>P/D 分离；两阶段可用不同硬件，优化吞吐、成本和功耗</td></tr>
+<tr><td>Mooncake</td><td>月之暗面（Kimi）</td><td>以 KV cache 为中心：P/D 分离 + 用闲置 CPU 内存和 SSD 组成分布式 KV 池 + 全局调度</td></tr>
+<tr><td>NVIDIA Dynamo</td><td>NVIDIA</td><td>KV 感知路由、P/D 分离，用 NIXL 传输 KV</td></tr>
+<tr><td>llm-d</td><td>Red Hat、IBM、Google 等</td><td>Kubernetes 原生：网关里做前缀缓存感知调度，支持 P/D 分离和分层前缀缓存</td></tr>
+<tr><td>LMCache</td><td>芝加哥大学等</td><td>独立的 KV cache 层：卸载到 CPU、磁盘、远端存储，可跨实例共享</td></tr>
+<tr><td>DeepSeek 线上</td><td>DeepSeek</td><td>P/D 分离（EP32 / EP144）+ 基于 3FS 的磁盘 KV cache</td></tr>
+</tbody></table>
+<div class="ex" id="ex-5"><h3>思考题</h3>
+<ol>
+<li><b>P/D 之间的 KV 传输</b>。条件：Llama-3.1-70B BF16（每个 token 的 KV 是 320 KiB），prefill 和 decode 实例都是 TP=8，每张卡一张 400 Gb/s 网卡（约 50 GB/s）。一个 8K token 的 prompt，prefill 计算约需 157 ms。
+<ol type="a">
+<li>这个请求的 KV 一共多大？每张卡要发多少？</li>
+<li>如果全部 KV 都从一张网卡发出，要多久？8 张卡各用自己的网卡发呢？</li>
+<li>如果按层流水传输（算完一层发一层，共 80 层），每层每张卡要发多少、需要多久？和每层约 1.97 ms 的计算时间相比，传输能不能被藏住？</li>
+</ol></li>
+<li><b>加载还是重算</b>。条件：Llama-3.1-8B 单卡（每个 token 的 KV 是 128 KiB）。用户隔 10 分钟回来，继续一段 20K token 的对话，GPU 里的 KV 已经被淘汰；重算 prefill 约需 444 ms。
+<ol type="a">
+<li>从 CPU 内存（50 GB/s）加载要多久？从本地 SSD（5 GB/s）呢？</li>
+<li>同样的 SSD，对 70B 划算（快 2.6 倍），对 8B 为什么不划算？请用"每读 1 字节 KV 能省下多少计算"来解释。</li>
+</ol></li>
+<li><b>路由设计</b>。条件：4 个实例，80% 的请求共用同一段 4K token 的 system prompt。
+<ol type="a">
+<li>只看缓存命中的路由器会出什么问题？</li>
+<li>至少给出两种改法。</li>
+<li>如果这是多租户服务，每个租户用不同的 cache_salt，路由器的全局索引应该怎么设计？</li>
+</ol></li>
+</ol>
+<p class="jumpline"><a class="jump" href="#ans-5">看答案 ↓</a></p></div>
+</section>
+
+<section id="l6"><h2>第 6 课　生产化：SLO、扩缩容、过载保护、可观测性与多租户安全</h2>
+<p class="lead"><b>一句话：</b>前 5 课解决的是"跑得快、跑得省"，生产环境还要"在真实流量下跑得稳"：流量有涨有落，要自动扩缩容；资源总有不够的时候，要定 SLO、留余量、做过载保护；出了问题要看得见，要可观测性；很多客户共用一套系统，要多租户隔离与安全。</p>
+<pre class="f">用户请求
+  ↓
+网关：鉴权、按租户注入身份和优先级、按 token 计的配额
+  ↓
+准入控制：系统快满时，按优先级排队，可丢弃的请求直接拒绝
+  ↓
+路由 → prefill 池 / decode 池（第 5 课）
+  ↓
+可观测性：每一步都打指标和追踪；扩缩容控制器根据指标增减两个池</pre>
+<h3>SLO 与 goodput</h3>
+<ul>
+<li><b>SLO 用分位数，不用平均值</b>：常见的是 TTFT 和 ITL 的 P90 或 P99。比如 Dynamo Planner 的默认目标是 TTFT 500 ms、ITL 50 ms<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>。平均值会把尾部的慢请求藏起来。</li>
+</ul>
+<aside class="q" id="q-6-1"><span class="badge">问 6.1</span>「ITL是啥缩写？」 <a class="jump" href="#a-6-1">看解答 ↓</a></aside>
+<ul>
+<li><b>要优化的是 goodput</b>：Mooncake 的标准是只有完整跑完的请求才计数；跑不完的请求，之前算过的 token 全部白费，所以没法在 SLO 内跑完的请求应该尽早拒绝。</li>
+<li><b>一定要留余量</b>：越接近满载，排队时间涨得越陡。</li>
+</ul>
+<pre class="f">平均排队时间 / 处理一个请求的时间 = ρ / (1 − ρ)（ρ 是利用率，M/M/1 模型）
+
+  利用率 50%：1.0 倍
+  利用率 70%：2.3 倍
+  利用率 80%：4.0 倍
+  利用率 90%：9.0 倍
+  利用率 95%：19.0 倍</pre>
+<p>LLM 引擎有 batching，不完全符合这个模型，但"越接近满载、延迟越陡"的规律一样。vLLM 文档把这个拐点叫作饱和点：再增加请求，吞吐不再上升，只是延迟变长。</p>
+<pre class="f">Little 定律：系统里同时在处理的请求数 = 到达速率 × 每个请求停留的时间
+
+例：每秒 20 个请求，每个输出 400 token，ITL 25 ms
+  每个请求的 decode 时间 = 400 × 25 ms = 10 秒
+  同时在 decode 的请求数 = 20 × 10 = 200 个</pre>
+<h3>自动扩缩容</h3>
+<ul>
+<li><b>不能照搬 Web 服务</b>：LLM 的延迟取决于请求内容而不只是请求数，一个 32K token 的 prompt 消耗的算力比短请求多几个数量级；prefill 随输入长度增长、decode 随并发和 KV 占用增长，一个副本数没法同时描述两者。</li>
+<li><b>不要按 GPU 利用率扩缩容</b>：nvidia-smi 的 GPU 利用率是采样周期内"至少有一个 kernel 在运行"的时间占比，不是算力用了多少；decode 受带宽限制，这个数字照样可能接近 100%。要看效率，得看 DCGM 的 SM 活跃比例和 Tensor Core 活跃比例。</li>
+</ul>
+<table><thead><tr><th>池</th><th>主要看</th><th>vLLM 里对应的指标<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span></th></tr></thead><tbody>
+<tr><td>prefill 池</td><td>排队的请求、TTFT</td><td>vllm:num_requests_waiting、vllm:time_to_first_token_seconds</td></tr>
+<tr><td>decode 池</td><td>KV 占用、ITL、正在跑的请求数</td><td>vllm:kv_cache_usage_perc、vllm:inter_token_latency_seconds、vllm:num_requests_running</td></tr>
+</tbody></table>
+<ul>
+<li><b>Dynamo Planner</b>：按 TTFT 和 ITL 目标分别调整 prefill 和 decode 的 worker 数；基于吞吐的模式结合流量预测、默认每 180 秒调一次，基于负载的模式默认每 5 秒调一次以应对突发<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>；两者一起开时，前者给容量下限，后者在下限之上做实时调整。</li>
+</ul>
+<p><b>冷启动是扩缩容最大的敌人</b>。以 70B BF16 的 141.2 GB 权重为例：</p>
+<table><thead><tr><th>权重从哪儿读</th><th>带宽（假设）</th><th>读完要多久</th></tr></thead><tbody>
+<tr><td>对象存储</td><td>整机 2 GB/s</td><td>70.6 秒</td></tr>
+<tr><td>分布式文件系统（类似 3FS）</td><td>整机 40 GB/s</td><td>3.5 秒</td></tr>
+<tr><td>本机多块 NVMe 并行读</td><td>整机 50 GB/s</td><td>2.8 秒</td></tr>
+<tr><td>本机 CPU 内存（sleep 模式唤醒）</td><td>每卡约 50 GB/s，8 卡并行，每卡 17.65 GB</td><td>0.35 秒</td></tr>
+</tbody></table>
+<ul>
+<li>完整的启动还包括拉镜像、初始化、编译和捕获 CUDA Graph 等步骤。</li>
+<li>加速办法：Run:ai Model Streamer 并发、流式地读权重；把权重缓存在本机 NVMe 或分布式文件系统；用 vLLM 的 sleep 模式做热备——第 1 级 sleep 把权重卸载到 CPU 内存、丢掉 KV cache，能释放 90% 以上的显存<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>，唤醒时不必重新完整加载模型。</li>
+</ul>
+<p>扩缩容模拟（每秒请求数用 10 分钟从 30 涨到 90，保持 20 分钟再降回；每台每秒处理 10 个，目标利用率 70%，每 30 秒决策一次；排队超过 2 秒算违反 SLO；启动中的实例也计费）：</p>
+<table><thead><tr><th>策略</th><th>SLO 达标率</th><th>P99 排队</th><th>实例·小时</th></tr></thead><tbody>
+<tr><td>按峰值固定 13 台</td><td>100.0%</td><td>0 秒</td><td>13.0</td></tr>
+<tr><td>自动扩缩，冷启动 5 分钟</td><td>83.6%</td><td>37 秒</td><td>10.5</td></tr>
+<tr><td>自动扩缩，冷启动 1 分钟</td><td>100.0%</td><td>0 秒</td><td>9.4</td></tr>
+<tr><td>冷启动 5 分钟 + 2 台热备</td><td>100.0%</td><td>0 秒</td><td>11.4</td></tr>
+</tbody></table>
+<pre class="f">流量瞬间从 30 跳到 90 时：
+  冷启动 1 分钟：            SLO 达标 93.6%，P99 排队 34 秒
+  冷启动 1 分钟 + 4 台热备：SLO 达标 94.8%，P99 排队 18 秒
+→ 扩容追不上真正的突发，要靠过载保护和更快的检测</pre>
+<h3>过载保护</h3>
+<ul>
+<li><b>按 token 计配额，而不是按请求数</b>：VTC（OSDI 2024）指出，按每分钟请求数限流会在系统空闲时也把客户挡在外面；2K token 和 200 token 的请求消耗差很多，应按 token 统计服务量、做公平调度。</li>
+<li><b>优先级和可丢弃请求</b>：Gateway API Inference Extension 用整数表示优先级，数字越大越优先，负数表示"可丢弃"，系统饱和时直接拒绝；vLLM 引擎的 <code>--scheduling-policy priority</code> 约定相反，数字越小越优先，并可抢占低优先级的请求。</li>
+<li><b>提前拒绝（Mooncake）</b>：做完 prefill 才被 decode 实例拒绝，算力就白花了，所以在 prefill 开始前就按两个池中更高的负载决定接不接；这会引起两个池负载的反相波动，于是进一步预测输出长度和短期负载。</li>
+<li><b>降级</b>：限制 max_tokens、切到小模型、排队设超时、返回 429 并带上 Retry-After。</li>
+<li><b>优先级和租户身份不能让客户端自己说了算</b>：由可信网关剥离外部头、按 API key 重新注入（和第 2 课 cache_salt 同理）。</li>
+</ul>
+<h3>可观测性</h3>
+<p>vLLM 的思路是：用服务器级指标解释请求级指标。</p>
+<table><thead><tr><th>指标</th><th>含义</th><th>用来判断什么</th></tr></thead><tbody>
+<tr><td>vllm:time_to_first_token_seconds</td><td>TTFT 直方图</td><td>用户要等多久才看到第一个字</td></tr>
+<tr><td>vllm:request_queue_time_seconds</td><td>排队时间</td><td>TTFT 里有多少是排队造成的</td></tr>
+<tr><td>vllm:inter_token_latency_seconds</td><td>相邻两次输出的间隔</td><td>decode 是否被 prefill 打断、batch 是否过大</td></tr>
+<tr><td>vllm:num_requests_waiting</td><td>排队中的请求数</td><td>该扩 prefill，还是该限流</td></tr>
+<tr><td>vllm:kv_cache_usage_perc</td><td>KV 块占用比例</td><td>是否快要抢占、该扩 decode</td></tr>
+<tr><td>vllm:prefix_cache_hits、vllm:prefix_cache_queries</td><td>前缀缓存的命中数和查询数</td><td>第 5 课的路由有没有生效</td></tr>
+<tr><td>vllm:admission_rejections_total</td><td>因队列上限被拒的次数</td><td>过载保护有没有在起作用</td></tr>
+</tbody></table>
+<pre class="f"># P99 TTFT（最近 5 分钟）
+histogram_quantile(0.99,
+  sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[5m])))
+
+# 前缀缓存命中率（最近 5 分钟）
+rate(vllm:prefix_cache_hits_total[5m])
+  / rate(vllm:prefix_cache_queries_total[5m])</pre>
+<ul>
+<li><b>追踪</b>：指标看一段时间的汇总，追踪看单个请求穿过各组件的全过程；vLLM 用 <code>--otlp-traces-endpoint</code> 打开 OpenTelemetry 追踪。P/D 分离后，只有追踪能告诉你时间花在网关、路由、prefill、KV 传输、decode 的哪一段。</li>
+<li><b>日志和追踪里不放原始 prompt</b>，导出链路要加密，追踪后端要管访问权限和保留期。</li>
+</ul>
+<h3>多租户安全：用 STRIDE 过一遍</h3>
+<table><thead><tr><th>类别</th><th>在推理系统里的表现</th><th>缓解</th></tr></thead><tbody>
+<tr><td>欺骗（S）</td><td>客户端自己填租户 ID、优先级或 cache_salt</td><td>网关剥离外部头，按认证后的身份重新注入</td></tr>
+<tr><td>篡改（T）</td><td>加载来路不明的权重、LoRA 或自定义代码</td><td>只从受信来源加载、校验哈希；用 safetensors 这类不含可执行代码的格式</td></tr>
+<tr><td>抵赖（R）</td><td>出事后查不到是哪个租户、哪个模型版本或 adapter</td><td>审计日志记录租户、版本、adapter，但不记 prompt 原文</td></tr>
+<tr><td>信息泄露（I）：缓存侧信道</td><td>利用前缀缓存命中带来的时延或调度顺序变化，还原别人的 prompt（如 PromptPeek）</td><td>缓存（salt）和路由索引都按租户隔离</td></tr>
+<tr><td>信息泄露（I）：内部通信</td><td>多机通信和 KV 传输默认不加密、不鉴权</td><td>放进隔离网络；防火墙只开放 API 端口</td></tr>
+<tr><td>信息泄露（I）：残留数据</td><td>GPU 本地内存没有清零，被下一个进程读到（如 LeftoverLocals）</td><td>及时打补丁；不同信任级别的负载不共用 GPU</td></tr>
+<tr><td>信息泄露（I）：日志与落盘</td><td>追踪和日志带原文；KV 卸载到共享存储</td><td>默认不记原文；加密、访问控制、TTL</td></tr>
+<tr><td>拒绝服务（D）</td><td>超长 prompt、多模态"解压炸弹"、某个租户刷量</td><td>按 token 的配额和公平调度；输入大小上限</td></tr>
+<tr><td>权限提升（E）</td><td>开发端点（sleep、collective_rpc）暴露给用户；API key 只保护 /v1 等路径<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span></td><td>不对外开开发模式；所有入口在网关统一鉴权</td></tr>
+</tbody></table>
+<div class="ex" id="ex-6"><h3>思考题</h3>
+<ol>
+<li><b>容量规划（Little 定律）</b>。条件：高峰时每秒 100 个请求，平均 prompt 2,000 token、输出 400 token；ITL 目标 25 ms（假设每个 token 都按 25 ms 输出）；模型是 Llama-3.1-70B BF16（每 token 的 KV 是 320 KiB，权重 141.2 GB），P/D 分离，两个池都用 TP=8 的 8 卡实例。
+<ol type="a">
+<li>decode 池里平均同时有多少个请求？</li>
+<li>每个请求平均占多少 KV（按 prompt 加一半输出估算）？每张卡按 80 GB 的 90% 可用、减去权重后的部分放 KV，只看 KV 容量，decode 池至少要几个实例？</li>
+<li>用第 1 课的方法检查：按 (b) 的实例数，decode 每一步的时间下限（先不算通信）能否满足 25 ms？</li>
+<li>prefill 池：按 MFU 50% 估算，至少要几个实例？prefill 和 decode 的实例数之比说明了什么？</li>
+</ol>
+<aside class="q" id="q-6-2"><span class="badge">问 6.2</span>「MFU是啥？」 <a class="jump" href="#a-6-2">看解答 ↓</a></aside></li>
+<li><b>扩容追不上突发</b>。条件：流量在很短时间内从每秒 30 个请求涨到 60 个；每台实例每秒能处理 10 个，目标利用率 70%；新实例冷启动要 5 分钟，假设流量一涨就立即开始扩容。
+<ol type="a">
+<li>涨之前、涨之后分别需要几台？</li>
+<li>没有热备的话，新实例就绪之前，积压最多会攒到多少个请求？新实例就绪后，要多久才能清空积压？</li>
+<li>至少要几台热备才完全不积压？如果想一直保持 70% 的目标利用率，又要几台？</li>
+</ol></li>
+<li><b>威胁建模</b>。场景：一个多租户推理平台，开了前缀缓存；KV 会卸载到所有租户共享的分布式存储；租户可以上传自己的 LoRA；P/D 分离，KV 要跨机传输；打开了 OpenTelemetry 追踪。请用 STRIDE 列出至少 4 个威胁和对应的缓解措施，并说说你会最先修哪一个、为什么。</li>
+</ol>
+<p class="jumpline"><a class="jump" href="#ans-6">看答案 ↓</a></p></div>
+</section>
+
+<section id="l7"><h2>第 7 节　延伸：新架构与新负载</h2>
+<p class="lead"><b>一句话：</b>主流大模型的骨架仍是 Transformer，但 MLP 普遍换成了 MoE，attention 分化成标准、稀疏或压缩、混合线性三条路线。推理系统里和权重、调度有关的部分基本不变；围绕 KV 的机制要扩展成“KV + 状态”。agent 的上下文压缩发生在客户端或 API 层，要和引擎的前缀缓存配合着用。</p>
+
+<h3 id="s7-1">7.1 Transformer 不等于 attention</h3>
+<aside class="q" id="q-7-1"><span class="badge">问 7.1</span>「我可以把transformer结构等同于attention吗？」 <a class="jump" href="#a-7-1">看解答 ↓</a></aside>
+<p>attention 是 Transformer 里负责“token 之间交换信息”的那一块，另一块 MLP 负责“每个 token 各自加工”。一层 = attention + MLP，再用残差和 RMSNorm 串起来（问 4.5 里的理解是对的）。</p>
+<pre class="f">输入 token → Embedding（查表变成向量）
+重复 32 层（Llama-3.1-8B），每层两块：
+  h = x + Attention(RMSNorm(x))   ← token 之间交换信息
+  y = h + MLP(RMSNorm(h))         ← 每个 token 各自加工
+→ RMSNorm → lm_head → 下一个 token 的概率</pre>
+<table><thead><tr><th>部件</th><th>负责什么</th><th>8B 参数占比</th></tr></thead><tbody>
+<tr><td>Attention 块（Q/K/V/O 投影 + 打分加权）</td><td>token 之间交换信息</td><td>16.7%</td></tr>
+<tr><td>MLP 块（SwiGLU）</td><td>每个 token 各自加工</td><td>70.2%</td></tr>
+<tr><td>Embedding + lm_head</td><td>token 和向量互相转换</td><td>13.1%</td></tr>
+<tr><td>RMSNorm、残差、RoPE</td><td>稳定数值、帮助训练深层网络、提供位置信息</td><td>几乎为 0</td></tr>
+</tbody></table>
+<ul>
+<li>“Attention Is All You Need”的意思是：token 之间交换信息只靠 attention，不再用 RNN 或卷积。原版 Transformer 同样有 MLP（论文里叫 FFN）、残差、LayerNorm 和位置编码，而且是 encoder + decoder 结构；现在的 LLM 大多只保留 decoder。attention 本身也不是 Transformer 发明的，2014 年就用在 RNN 翻译模型里了。</li>
+<li><b>对推理的意义</b>：权重的大头在 MLP，decode 每步读权重主要读的是 MLP，MoE 替换的也是 MLP；KV cache 只属于 attention，因为 MLP 只看当前 token，没有跨 token 的状态；以 8B 为例，decode 时上下文不到约 2.7 万 token，计算大头在线性层（MLP 加 attention 的四个投影），更长时 attention 的打分和加权求和才反超；TP 时 attention 按 head 切，MLP 把 W_up 按列、W_down 按行切。</li>
+</ul>
+
+<h3 id="s7-2">7.2 2025 年之后的主流模型<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span></h3>
+<aside class="q" id="q-7-2"><span class="badge">问 7.2</span>「那2025年之后的主流模型都是transformer架构吗？」 <a class="jump" href="#a-7-2">看解答 ↓</a></aside>
+<p>骨架基本都还是 Transformer，但“每一层都是标准 attention”已经不是唯一主流。大模型的 MLP 大多换成了 MoE，变化集中在 attention 那一半。下面都是公开了结构的开源模型，闭源旗舰大多不公开这些细节。</p>
+<table><thead><tr><th>路线</th><th>做法</th><th>代表模型</th></tr></thead><tbody>
+<tr><td>标准 Transformer</td><td>每层都是 softmax attention（GQA 或 MLA）</td><td>gpt-oss、MiniMax M2</td></tr>
+<tr><td>改造 attention</td><td>每层仍是 attention，但只看一部分 token，或者把 KV 压缩</td><td>DeepSeek-V3.2、DeepSeek-V4</td></tr>
+<tr><td>混合架构</td><td>大部分层换成线性 attention 或 Mamba，只保留少数 full attention 层</td><td>Qwen3-Next、Qwen3.5、Kimi Linear、Nemotron 3</td></tr>
+</tbody></table>
+<ul>
+<li><b>标准</b>：gpt-oss 是在 GPT-2、GPT-3 架构基础上做的 MoE Transformer；MiniMax M2 是 62 层的 decoder-only Transformer，62 层全部用 GQA。</li>
+<li><b>改造 attention</b>：DeepSeek-V3.2 的 DSA 先用轻量的 lightning indexer 给前文打分，每个 query 只看得分最高的 2,048 个 token——MLA 让每条 KV 变小，DSA 减少每次要读的条数。DeepSeek-V4（2026 年 4 月）把 CSA 和 HCA 两种压缩 attention 混合使用，还把标准残差连接换成了 mHC；1M 上下文下，每生成一个 token 的计算量只有 V3.2 的 27%，KV cache 只有 10%。</li>
+<li><b>混合架构</b>：Qwen3-Next（2025 年 9 月）每 3 层 Gated DeltaNet（一种线性 attention）配 1 层 full attention，共 48 层；Qwen3.5（2026 年 2 月）整个系列沿用 3:1。Kimi Linear 按层混合 KDA 和 MLA，报告 KV cache 最多减少 75%、1M 上下文 decode 吞吐最高 6 倍。Nemotron 3 主要由 Mamba-2 层和 MoE 层交替组成，只保留极少数 attention 层。</li>
+<li><b>为什么不全换掉</b>：纯线性结构的记忆容量是固定的，处理长序列、从上下文里准确找回信息都比较困难，所以保留少数全局 attention 层作为折中。</li>
+<li><b>也有团队退了回来</b>：MiniMax 上一代用过 Lightning Attention 混合结构，M2 又改回全部 full attention。他们的解释是：小规模、旧评测上混合结构和纯 full attention 一样好，规模变大后复杂的多步推理明显变差；而且现有的软硬件生态越来越围绕 full attention 优化。</li>
+</ul>
+
+<h3 id="s7-3">7.3 换了架构，推理系统要改什么</h3>
+<aside class="q" id="q-7-3"><span class="badge">问 7.3</span>「因为我感觉这个课程学习下来好像LLM推理系统都是围绕attention也就是KV设计的，如果是这样的话我想问换个不用attention的模型，或者attention变种，那LLM推理系统需要改变吗？」 <a class="jump" href="#a-7-3">看解答 ↓</a></aside>
+<p>课程里大约一半的设计围绕权重和调度，这部分基本不用改；另一半围绕 KV，要改的原因不是 attention 没了，而是 KV 的几个关键性质变了。</p>
+<table><thead><tr><th>性质</th><th>KV cache</th><th>线性 attention / Mamba 的状态</th></tr></thead><tbody>
+<tr><td>大小</td><td>随上下文长度增长</td><td>固定</td></tr>
+<tr><td>粒度</td><td>每个 token 一份</td><td>每个请求一份</td></tr>
+<tr><td>更新方式</td><td>只往后追加，旧的不变</td><td>原地覆盖</td></tr>
+<tr><td>能否退回到更短的前缀</td><td>能，截掉后面的就行</td><td>不能</td></tr>
+</tbody></table>
+<table><thead><tr><th>课程内容</th><th>换成混合架构之后</th></tr></thead><tbody>
+<tr><td>第 1 课：roofline、decode 每步读全部权重</td><td>不变；“读 KV”那一项变成读一个固定大小的状态</td></tr>
+<tr><td>第 2 课：continuous batching、chunked prefill</td><td>不变，调度和模型结构无关</td></tr>
+<tr><td>第 2 课：PagedAttention</td><td>attention 层照旧；状态层按请求分配固定槽位，两种池子的比例要能调</td></tr>
+<tr><td>第 2、5 课：前缀缓存、KV 感知路由</td><td>大改：状态只能在保存过的检查点上精确命中，索引记录的是检查点</td></tr>
+<tr><td>第 3 课：FlashAttention</td><td>线性 attention / SSM 要用自己的分块计算 kernel</td></tr>
+<tr><td>第 3 课：量化、CUDA Graph</td><td>基本不变；对状态做低精度存储要更小心</td></tr>
+<tr><td>第 3 课：投机解码</td><td>要改：被拒的草稿 token 已经改写了状态，要保存中间状态才能回退</td></tr>
+<tr><td>第 4 课：TP、EP、MoE</td><td>不变，MLP/MoE 那一半没变</td></tr>
+<tr><td>第 5 课：P/D 传 KV、分层存储</td><td>要传、要存的东西从 KV 变成“KV + 状态”</td></tr>
+<tr><td>第 6 课：扩缩容、SLO、安全</td><td>基本不变；容量规划按“KV + 状态”来算</td></tr>
+</tbody></table>
+<p>用 Qwen3-Next 的公开配置估算一下（每 4 层 1 层 full attention；full attention 层 2 个 KV head、head_dim 256；线性层 32 个 value head，key / value head_dim 都是 128）：</p>
+<pre class="f">Qwen3-Next-80B-A3B：48 层 = 12 层 full attention + 36 层 GDN
+
+full attention 层的 KV（BF16，随长度增长）
+  2 × 2 个 KV head × 256 维 × 2 字节 × 12 层 = 24 KiB / token
+GDN 层的状态（BF16，固定大小）
+  每层：32 × 128 × 128 × 2 字节 = 1 MiB，另有 48 KiB 卷积状态
+  36 层合计 ≈ 37.7 MiB / 请求（约等于 1,600 个 token 的 KV）
+
+一个 32K 上下文的请求：
+  KV 768 MiB + 状态 37.7 MiB ≈ 806 MiB
+  如果 48 层全是 full attention：3,072 MiB，约 3.8 倍
+每 256 个 token 存一个状态检查点：
+  这 256 个 token 的 KV 只有 6 MiB，一个检查点却要 37.7 MiB</pre>
+<ul>
+<li><b>引擎的做法</b><span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>：vLLM 的 hybrid KV cache manager 按层的类型分配不同的槽位，并按层定前缀命中规则；SGLang 用可伸缩的内存池，按负载动态调整状态池和 KV 池的比例。</li>
+<li><b>检查点的两难</b>（Marconi 论文）：想多命中就要频繁保存检查点，比如每 256 个 token 一个，但每个检查点都很大，而且大多用不上。上面算出一个检查点约等于 1,600 个 token 的 KV（状态用 FP32 存还要再翻一倍），所以要按“复用的可能性”和“省下的计算 ÷ 占用的显存”挑着存。</li>
+<li><b>attention 变种看它改了 KV 的哪个性质</b>：只改每个 token 的 KV 大小（GQA、MLA），框架不用动，只换 kernel 和 KV 布局；滑动窗口只需保留最近一个窗口的 KV，前缀命中也只要求窗口内的 KV 还在；稀疏或压缩 attention（DSA、DeepSeek-V4）会多出新的缓存种类，比如 SGLang 支持 V4 时要管 full attention 和滑动窗口两套页，外加压缩 KV、indexer 缓冲区、compressor 状态等附属池。</li>
+<li><b>趋势</b>：引擎把“KV cache”抽象成“每层一种缓存，各有自己的复用规则”。SGLang 的 Unified Radix Cache 规定：full attention 的 KV 在整个匹配前缀上都能复用，滑动窗口只覆盖结尾的那个窗口，循环状态只在精确的前缀检查点上有效；新架构加一个组件即可，不用另写一套缓存树。</li>
+</ul>
+<p><b>判断新架构的三个问题：</b></p>
+<ol>
+<li>每个请求要存的东西，会不会随上下文长度增长？→ 决定显存管理和容量规划。</li>
+<li>存的东西能不能截断成更短前缀的版本？→ 决定前缀缓存和投机解码怎么做。</li>
+<li>每个 token、每个请求要存多少字节？→ 决定 P/D 之间传输和分层存储划不划算。</li>
+</ol>
+
+<h3 id="s7-4">7.4 上下文压缩：客户端还是推理引擎</h3>
+<aside class="q" id="q-7-4"><span class="badge">问 7.4</span>「实际使用agent时1M的context长度比较常见，还会进行上下文压缩，这个是属于客户端的优化还是推理引擎的优化？」 <a class="jump" href="#a-7-4">看解答 ↓</a></aside>
+<p>两边都做，但做的是两件不同的事：agent 里说的“上下文压缩”（compaction）在客户端或 API 层，减少的是发给模型的 token；推理引擎和模型做的是“KV 压缩”，token 不变，改的是 KV 怎么存、放在哪、每步读多少。</p>
+<table><thead><tr><th>层</th><th>做什么</th><th>改变了什么</th><th>例子</th></tr></thead><tbody>
+<tr><td>客户端 / agent 框架</td><td>把旧对话写成摘要、删掉旧的工具输出、把子任务交给子 agent</td><td>发给模型的 token 变少</td><td>各家 agent 自带的自动压缩</td></tr>
+<tr><td>API 平台</td><td>同样的事，由服务方在服务端代做</td><td>同上</td><td>Claude 的 compaction 和 context editing、OpenAI 的 compaction<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span></td></tr>
+<tr><td>推理引擎</td><td>KV 量化、卸载到 CPU/SSD、前缀缓存</td><td>token 不变，KV 的存法和存放位置变了</td><td>vLLM 的 FP8 KV cache、LMCache</td></tr>
+<tr><td>模型结构</td><td>MLA、稀疏 attention、混合线性层</td><td>每个 token 的 KV 变小，或者不再随长度增长</td><td>DeepSeek-V4、Qwen3.5</td></tr>
+</tbody></table>
+<ul>
+<li><b>支持 1M 为什么还要压缩</b>：上下文越长，模型准确找回信息的能力越差（context rot）；这是逐渐下降，不是突然失效。压缩同时也省钱、省延迟。</li>
+<li><b>常见做法</b>：Claude 的 compaction 在服务端把旧轮次写成摘要；context editing 在 prompt 送进模型之前由服务端删掉旧的工具结果，客户端仍保留完整历史；OpenAI 的 Responses API 在 token 数超过阈值时自动压缩（文档示例的阈值是 200K）；子 agent 用几万个 token 干活，只交回 1,000 到 2,000 token 的摘要。</li>
+<li>API 层的压缩虽然在服务端执行，仍属于应用层：它在 prompt 进入模型之前改 token，和推理引擎无关。</li>
+</ul>
+<pre class="f">假设一个 70B、full attention 的模型能跑 1M 上下文
+（参数同第 1 课的 Llama-3.1-70B，TP=8，H100，MFU 50%）
+
+1M token 的 KV：327.7 GB，占一个 8 卡实例 KV 容量的 75%
+每一轮新增 2,000 token：
+  命中前缀缓存：只算新 token，prefill ≈ 1.4 秒
+  没命中：整段重新 prefill ≈ 367 秒（约 6 分钟）
+  decode 每步 ≈ 17.5 ms，其中读 KV 占 12.2 ms
+压缩成 50K token 之后：
+  重新 prefill 一次 ≈ 2.6 秒
+  KV 16.4 GB（3.8%），之后每轮新增 2,000 token ≈ 0.14 秒</pre>
+<ul>
+<li><b>前缀缓存是两层之间的接口</b>：命中约 1.4 秒，不命中约 6 分钟。Manus 把 KV-cache 命中率当作生产环境 agent 最重要的单一指标；用 Claude Sonnet 时，缓存命中的输入 token 价格只有未命中的十分之一<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>。做法：前缀保持稳定（差一个 token，从那里往后的缓存全部失效）；上下文只追加，不改之前的动作和观察结果；自己部署时打开前缀缓存，并用 session ID 把同一会话固定路由到同一个 worker（第 5 课的 KV 感知路由）。</li>
+<li><b>压缩本身会让缓存失效</b>：改写历史后，从改动的位置往后，前缀就和以前不一样了。Claude 的文档建议每次清掉足够多的 token，让这次失效划算。</li>
+<li><b>所以压缩要少做，每次做得彻底</b>：付一次重新 prefill 的代价，换来之后每轮便宜约 10 倍、KV 占用从 75% 降到 3.8%，同一个实例能服务的会话数大约多 20 倍。system prompt 和工具定义固定放在最前面，压缩之后这一段仍然能命中缓存。</li>
+</ul>
+
+<h3 id="s7-5">7.5 这份笔记有多通用</h3>
+<aside class="q" id="q-7-5"><span class="badge">问 7.5</span>「那么是否可以说这次LLM推理系统学习笔记还算通用？」 <a class="jump" href="#a-7-5">看解答 ↓</a></aside>
+<table><thead><tr><th>层次</th><th>内容</th><th>通用程度</th></tr></thead><tbody>
+<tr><td>分析方法</td><td>roofline、按字节数和计算量估算、Little 定律、先找瓶颈再优化</td><td>最通用，换架构、换硬件都能用</td></tr>
+<tr><td>系统骨架</td><td>continuous batching、chunked prefill、量化、CUDA Graph、TP/PP/EP、P/D 分离的出发点、路由、扩缩容、SLO、安全</td><td>和 attention 无关，基本通用</td></tr>
+<tr><td>KV 相关机制</td><td>PagedAttention、前缀缓存、KV 感知路由、P/D 之间传 KV、KV 分层存储、投机解码</td><td>对 attention 层仍然适用；混合架构要扩展成“KV + 状态”</td></tr>
+<tr><td>具体数字和软件细节</td><td>H100 参数、Llama-3.1 的例子、vLLM / SGLang / Dynamo 的接口和默认行为</td><td>时效性最强，正文里标了<span class="ts">时效</span></td></tr>
+</tbody></table>
+<ul>
+<li><b>KV 机制没有过时</b>：混合架构也保留了 full attention 层（Qwen3-Next 每 4 层 1 层，Nemotron 3 保留少数几层）；SGLang 的统一前缀缓存里，full attention 组件始终都在，状态和滑动窗口是在它旁边另加的组件。</li>
+<li><b>会过时的部分</b>：295 这个拐点、3.35 TB/s 都是 H100 的参数，换 GPU 要重算，但算法不变；课程主要用 Llama-3.1（dense + GQA），现在的主流大模型基本是 MoE，attention 也在往稀疏、压缩、混合方向走；框架的默认行为变得很快，比如问 5.2 说的 NixlConnector 默认拉取方式，2026 年 10 月又有了推送式的 connector。</li>
+<li><b>本节补上的和仍值得跟进的</b>：本节补上了混合架构、稀疏或压缩 attention、agent 负载三块。另一个值得跟进的方向是更低精度：Nemotron 3 的 Super 和 Ultra 用 NVFP4 训练，FP4 会让第 1、3 课里“每个参数几字节”再减半，计算方法不变。</li>
+</ul>
+</section>
+<section id="answers"><h2>思考题答案</h2><article class="ans" id="ans-1"><h3>第 1 课思考题答案（复习版）</h3><pre class="f">(a) 4,096 × 128 KiB = 512 MiB ≈ 0.537 GB
+(b) 每步要读：16.06 GB（权重）+ 32 × 0.537 GB（KV）≈ 33.24 GB
+    每步下限：33.24 GB / 3.35 TB/s ≈ 9.92 ms
+    每秒合计：32 / 9.92 ms ≈ 3,225 个 token
+(c) 线性层的算术强度约等于 batch 大小 32；算上读 KV，整体只有约 17.5
+    都远小于 H100 的约 295 → 带宽瓶颈
+(d) 可用于 KV：80 GB × 0.9 − 16.06 GB ≈ 55.94 GB
+    55.94 GB / 0.537 GB ≈ 104 个请求</pre><p class="tip"><b>当时的易错点：</b>decode 每一步都要把全部权重读一遍，不是只读一次；GB 和 GiB 混用。</p><p class="back"><a href="#ex-1">↑ 回到题目</a></p></article><article class="ans" id="ans-2"><h3>第 2 课思考题答案</h3><pre class="f">(a) 每个请求：1,500 / 16 = 93.75 → 94 个 block
+    300 个请求：300 × 94 = 28,200 个 block ≈ 59.1 GB（每块 2 MiB）
+(b) 1,000 token 的 system prompt = 62 个整块（992 token）+ 8 个 token
+    62 个整块只存 1 份：省下 299 × 62 = 18,538 个 block ≈ 38.9 GB
+    剩下 9,662 个 block ≈ 20.3 GB
+(c) 第 63 块里前 8 个 token 是 system prompt，后 8 个已经是各用户自己的输入；
+    内容不同，KV 也不同，不能共享</pre><p class="back"><a href="#ex-2">↑ 回到题目</a></p></article><article class="ans" id="ans-3"><h3>第 3 课思考题答案（复习版）</h3><ol>
+<li>普通实现要把 N × N 的分数矩阵写回显存、再读出来做 softmax 和加权求和，长序列时这部分显存读写才是瓶颈。FlashAttention 分块在片上 SRAM 里算完（online softmax），省掉了这些读写：计算量不变，时间省在访存上。</li>
+<li>BF16 约 4.79 ms，FP8 约 2.40 ms，INT4 约 1.20 ms。decode 受带宽限制，搬的字节减半，时间就近似减半；prefill 受算力限制，只量化权重时计算仍按 BF16 做，算力没变，所以帮助不大，要用 FP8 计算（峰值 1,979 TFLOPS）才会明显变快。</li>
+<li><pre class="f">(a) S = (1 − 0.8<sup>5</sup>) / (1 − 0.8) ≈ 3.36 个 token
+(b) 每步耗时 = 1（验证）+ 4 × 0.1（草稿）= 1.4 个“大模型步”
+    加速比 ≈ 3.36 / 1.4 ≈ 2.40 倍
+(c) α = 0.6：S ≈ 2.31，加速比 ≈ 2.31 / 1.4 ≈ 1.65 倍</pre></li></ol><p class="back"><a href="#ex-3">↑ 回到题目</a></p></article><article class="ans" id="ans-4"><h3>第 4 课思考题答案</h3><ol><li><pre class="f">(a) 权重：405 GB / 8 ≈ 50.6 GB 每卡（FP8 每个参数 1 字节）
+    KV（按 BF16 存）：2 × 126 × 8 × 128 × 2 = 516,096 字节 = 504 KiB 每 token
+    TP=8 时每卡 1 个 KV head：504 / 8 = 63 KiB（KV 也用 FP8 则再减半）
+(b) 50.6 GB / 3.35 TB/s ≈ 15.1 ms
+(c) 每层 2 次 × 126 层 = 252 次；252 × 10 µs = 2.52 ms，约占 15.1 ms 的 16.7%</pre></li>
+<li><ol type="a">
+<li>每张卡只读 1/8 的权重，但一个 token 要依次走完 8 段：8 × 15.1 ms ≈ 121 ms，等于整个模型 405 GB / 3.35 TB/s。</li>
+<li>让 8 段同时有活干：流水线里至少要有 8 个微批（足够多的并发请求），显存也要放得下这些请求的 KV。这时每段每 15.1 ms 就能交出一批 token，吞吐接近 TP=8。</li>
+<li>机间带宽不够、TP 跨机不划算时；更看重吞吐、对单请求延迟不敏感时（离线、批处理）；单机放不下时，常用“机内 TP + 机间 PP”。</li>
+</ol></li>
+<li><ol type="a">
+<li>Mixtral：2/8 = 1/4；DeepSeek-V3：8/256 = 1/32。</li>
+<li>295 × 4 = 1,180；295 × 32 = 9,440。</li>
+<li>细粒度 MoE 的每个专家只分到很小一份 token，一台机器上的 batch 远远不够。大规模 EP 把专家分散到很多张卡上，每张卡只放少数几个专家，汇集所有卡送来的 token，才凑得够 batch；同时 671B 的权重也分摊开了，每张卡省出显存放 KV。</li>
+</ol></li></ol><div class="mine"><b>我的作答与批改：</b>1a 权重对（50 GB）；KV 写成“缺少数据”——用 2 × 层数 × KV head 数 × head_dim × 字节数即可算出，我当时把 KV head 数写成了 128。1b、2a 写“缺少带宽”——直接用第 1 课的 H100 3.35 TB/s。1c 次数和时间对，占比漏算。2b 对；2c 只答了“看重吞吐”，漏了跨机带宽这一条。3a、3b 对；3c 不会，见上。</div><p class="back"><a href="#ex-4">↑ 回到题目</a></p></article><article class="ans" id="ans-5"><h3>第 5 课思考题答案</h3><ol><li><pre class="f">(a) 8,192 × 320 KiB = 2,560 MiB ≈ 2.68 GB；每张卡 335.5 MB
+(b) 一张网卡：2.68 GB / 50 GB/s ≈ 53.7 ms；8 张网卡各发各的：≈ 6.71 ms
+(c) 每层每卡 335.5 MB / 80 ≈ 4.19 MB，约 0.084 ms，只有每层计算（约 1.97 ms）的 4.3%
+    能藏住：总耗时 ≈ 157.3 ms（不重叠是 164.0 ms）</pre></li><li><pre class="f">(a) 20,480 × 128 KiB = 2,560 MiB ≈ 2.68 GB
+    CPU 内存：≈ 53.7 ms，比重算（444 ms）快约 8.3 倍
+    本地 SSD：≈ 537 ms，比重算还慢约 93 ms
+(b) 每读 1 字节 KV 能省下的计算 = 2 × 参数量 / 每 token 的 KV 字节
+    70B：2 × 70.6B / 327,680 ≈ 430,908 FLOP/字节
+    8B： 2 × 8.03B / 131,072 ≈ 122,528 FLOP/字节（70B 是它的约 3.5 倍）
+    盈亏平衡带宽 = KV 字节数 / 重算时间
+      8B 单卡 ≈ 6.05 GB/s；70B TP=8 每卡 ≈ 1.93 GB/s
+    SSD 的 5 GB/s 落在两者之间：对 70B 够快，对 8B 不够</pre><p>延伸：DeepSeek-V3 每个 token 只激活 37B 参数，MLA 让每个 token 的 KV 只有 70,272 字节，每读 1 字节 KV 能省约 105 万 FLOP（约是 70B 的 2.4 倍）。这也是它把 KV cache 放到 SSD 上仍然划算的原因。</p></li>
+<li><ol type="a">
+<li>共用热门前缀的 80% 请求全压到一个实例上：它承担 80% 的流量，是平均值的 3.2 倍，其余 3 个实例每个只分到约 6.7%。热点实例排长队，缓存还要装下这些用户的对话历史，容易被挤满。</li>
+<li>代价函数同时看缓存和负载；把热点前缀复制到所有实例（70B 每个实例只占 1.34 GB，每卡 168 MB），之后按对话历史和负载选；给每个实例设负载上限，或像 SGLang 那样不均衡时退回最短队列。随机路由只保得住 system prompt 的命中，会把同一对话的多轮请求打散（第 5 课模拟：随机 58.2%，缓存 + 负载 77.5%）。</li>
+<li>把 salt 混进块哈希链的第一块，不同租户的同一段文本，哈希完全不同，索引里自然查不到对方；salt 由网关按认证后的身份注入；命中情况、监控指标和日志都不跨租户暴露。隔离的代价是公共 system prompt 每个租户各存一份，可以让同一租户的请求尽量集中在少数实例上。</li>
+</ol><pre class="f">h1 = hash(salt, 第 1 块的 token)
+h2 = hash(h1,   第 2 块的 token)
+h3 = hash(h2,   第 3 块的 token) …</pre></li></ol><div class="mine"><b>我的作答与批改：</b>1a–1c 方法全对，但把 2,560 MiB 写成了 2.56 GB，数值偏小 4.6%；1c 漏写每层每卡的数据量（4.19 MB）。2a 方法对、单位问题同上，漏了“SSD 比重算还慢”这个结论；2b 没写完，而且 70B 每个 token 的 KV 是 320 KiB，不是 1120 KB。3a 对；3b“缓存 + 负载”对，“随机也可”只对一半；3c 方向对。</div><p class="back"><a href="#ex-5">↑ 回到题目</a></p></article><article class="ans" id="ans-6"><h3>第 6 课思考题答案</h3><ol><li><pre class="f">(a) 400 × 25 ms = 10 秒；100 × 10 = 1,000 个
+(b) 每个请求：(2,000 + 200) × 320 KiB = 704,000 KiB = 687.5 MiB ≈ 720.9 MB
+    1,000 个请求 ≈ 720.9 GB
+    每卡可放 KV：80 GB × 0.9 − 141.2 GB / 8 = 54.35 GB；每个 8 卡实例 434.8 GB
+    720.9 / 54.35 ≈ 13.3 → 14 张卡；720.9 / 434.8 ≈ 1.66 → 2 个实例
+(c) 每实例 500 个请求，每卡每步读 KV：500 × 2,200 × 40,960 字节 ≈ 45.06 GB
+    每步下限 = (17.65 + 45.06) GB / 3.35 TB/s ≈ 18.7 ms &lt; 25 ms，满足
+    加上 160 次 all-reduce（约 1.6 ms）约 20.3 ms；想留余量用 3 个实例（约 14.2 ms）
+(d) prefill 每秒要算：100 × 2,000 × 141.2 GFLOP ≈ 2.824e16 FLOP/s
+    每实例在 MFU 50% 时：8 × 989.4 TFLOPS × 0.5 ≈ 3.958e15 FLOP/s
+    需要 7.14 → 8 个实例</pre><aside class="q" id="q-6-3"><span class="badge">问 6.3</span>「你这个单位换算正确吗？？」 <a class="jump" href="#a-6-3">看解答 ↓</a></aside><p>P 与 D 的实例数之比是 8 比 2：prompt 是输出的 5 倍长，这种负载下 prefill 池才是大头。P/D 分离正好让两个池按各自的瓶颈分别配置；前缀缓存命中一半，prefill 池就能从 7.14 降到约 3.57（4 个实例）；负载反过来（短 prompt、长输出）时，比例也会反过来。</p></li>
+<li><pre class="f">(a) 涨之前 30 / (10 × 0.7) ≈ 4.3 → 5 台；涨之后 60 / 7 ≈ 8.6 → 9 台
+(b) 5 台全力跑 50 个/秒，每秒缺口 10 个；5 分钟积压 10 × 300 = 3,000 个
+    9 台就绪后全力跑 90 个/秒，每秒多消化 30 个；清空要 3,000 / 30 = 100 秒
+(c) 不积压：6 台 × 10 = 60，至少 1 台热备；保持 70%：9 − 5 = 4 台</pre><p>3,000 个积压意味着：排得最久的请求约 50 秒（第 250 秒左右到达的那批）。按正文模拟里“排队超过 2 秒算违反 SLO”的标准，第 10 秒到第 394 秒之间到达的请求全部超标，持续约 6.4 分钟。</p></li>
+<li><ul>
+<li><b>信息泄露</b>：前缀缓存的计时侧信道（如 PromptPeek）→ 按信任边界加 salt；GPU 前缀缓存、路由器全局索引、共享存储里卸载的 KV，三处的 key 都要带 salt。</li>
+<li><b>身份伪装</b>：伪造租户身份 → 网关鉴权后注入身份，不接受客户端提供的值；这是其他所有按租户隔离措施的前提。</li>
+<li><b>篡改 / 权限提升</b>：上传的 LoRA 里藏可执行代码 → 只接受 safetensors、校验哈希、隔离加载；adapter ID 带租户命名空间或用内容哈希，防同名冒用。拒绝服务是另一回事：超大或大量 adapter 占满显存和存储，要限制 rank、大小和数量。</li>
+<li><b>信息泄露</b>：追踪里带原文 → 默认不记原文、TLS 导出、追踪后端做访问控制和保留期。</li>
+<li><b>共享 KV 存储</b>：别的租户或进程读到 KV、写入伪造的 KV（推演出的风险）→ 存储只允许推理服务自己的身份读写、key 带 salt、按租户加密、设 TTL。</li>
+<li><b>跨机传 KV</b>：窃听、篡改、伪造 prefill 节点 → 专用隔离网络、防火墙只放行受信主机、只接受已注册节点。</li>
+<li><b>拒绝服务</b>：某个租户写满共享存储、刷爆队列 → 按租户的存储和 token 配额、公平调度。</li>
+<li><b>权限提升</b>：开发端点暴露、API key 只保护部分路径 → 不对外开开发模式，所有入口在网关统一鉴权。</li></ul>
+<p><b>最先修哪个</b>：先修身份伪装。salt、配额、优先级、adapter 权限、存储 key 全都按租户身份划分；身份能伪造，这些隔离一起失效，而且改一个请求头就能利用。同时把“恶意 LoRA 能否执行代码”当作同级的上线阻断项，它一旦得手，影响整台服务器和所有租户。侧信道排在后面：危害真实，但需要大量请求和一定的先验知识，加好 salt 就基本堵住。</p></li></ol><div class="mine"><b>我的作答与批改：</b>Q1：(a) 对；(b) 687.5 MiB 对，“14”是卡数，应为 2 个实例；(c) 题目漏给带宽（H100 3.35 TB/s）；(d) 当时问了 MFU（见问 6.2）。Q2：(a)、(c) 对；(b) 把 70% 目标利用率当成了处理上限，得到 7,500 和 2,500 秒，应为 3,000 和 100 秒。Q3：侧信道、身份伪装、追踪泄露三条对；恶意 LoRA 应归为篡改 / 权限提升，而不是拒绝服务；漏了共享存储、跨机传输两块，也没回答“最先修哪个”。</div><p class="back"><a href="#ex-6">↑ 回到题目</a></p></article></section><section id="qa"><h2>提问解答</h2><p class="muted">按课程顺序排列；每条末尾的链接可以跳回提问在正文中的位置。</p><h3 class="grp">第 0 课 · 全景</h3><article class="qa" id="a-0-1"><h4><span class="badge">问 0.1</span></h4><p class="qtext">「这个thread用于学习LLM推理系统。你先给我介绍一下一个大型LLM推理系统包含哪些组件，各自负责什么功能？」</p><p>就是第 0 课本身：七个组件（网关、预处理、路由、推理引擎、KV 传输与存储、控制面、可观测性）和三个核心矛盾（吞吐与延迟、显存、prefill 与 decode）。后面 6 课按“单步计算 → 推理引擎 → 单卡优化 → 多卡并行 → 集群 → 生产”的顺序逐层展开。</p><p class="back"><a href="#q-0-1">↑ 回到原文</a></p></article><h3 class="grp">第 1 课 · 推理基础</h3><article class="qa" id="a-1-1"><h4><span class="badge">问 1.1</span></h4><p class="qtext">「decode 的算术强度为什么约等于 batch 大小 B？」<span class="muted">（大意）</span></p><p>看一个线性层 Y = X · W：X 有 B 行（这一步的 B 个 token），W 是 d × d。</p><pre class="f">计算量：Y 有 B × d 个元素，每个要做 d 次乘加 → 2 × B × d² FLOP
+访存：  主要是读一遍 W（BF16 每个数 2 字节）  → 2 × d² 字节
+        （B 很小时，X 和 Y 的读写可以忽略）
+算术强度 = 2Bd² / 2d² = B</pre><ul>
+<li>含义：权重读进来一次，能给 B 个 token 用；B 越大，每读 1 字节换来的计算越多。</li>
+<li>H100 要到约 295 才喂得饱算力，decode 的 batch 通常远小于它，所以加大 batch 几乎是“白赚”吞吐，直到显存容量或 ITL 目标先顶到上限。</li></ul><p class="back"><a href="#q-1-1">↑ 回到原文</a></p></article><article class="qa" id="a-1-2"><h4><span class="badge">问 1.2</span></h4><p class="qtext">「有没有把模型权重直接做进芯片、绕开显存带宽瓶颈的推理芯片？」<span class="muted">（大意）</span></p><p>有，思路都是绕开“每生成一个 token 都要把权重从显存读一遍”这个瓶颈：</p><ul>
+<li><b>把权重直接做成电路</b>：Taalas 的 HC1 把一个具体模型的权重固化在芯片里，换模型就得换芯片。</li>
+<li><b>把权重全放进片上 SRAM</b>：Groq 的 LPU、Cerebras 的晶圆级芯片，用大量片上存储代替 HBM，带宽高得多，但单芯片容量有限，大模型要用很多芯片拼起来。</li>
+<li><b>存内计算</b>：d-Matrix 在存储阵列旁边直接做计算，减少数据搬运。</li>
+<li><b>只为 Transformer 设计的 ASIC</b>：Etched。</li></ul>
+<p>代价都是灵活性或容量：模型、精度或上下文长度一变，硬件可能就不合适了。</p><p class="back"><a href="#q-1-2">↑ 回到原文</a></p></article><h3 class="grp">第 2 课 · 推理引擎</h3><article class="qa" id="a-2-1"><h4><span class="badge">问 2.1</span></h4><p class="qtext">「为什么一个请求在做 prefill，会让同一批里别人的 decode 变慢？」<span class="muted">（大意）</span></p><ul>
+<li>引擎的每一步是一个同步点：GPU 把这一步 batch 里所有请求的计算都做完，才给每个请求发出下一个 token。</li>
+<li>这一步里如果混进一个长 prompt 的 prefill，这一步的时长就由 prefill 决定，batch 里所有 decode 请求都要陪着等：8B 的例子里，从每步 12.81 ms 变成约 0.82 秒。</li>
+<li>解法：chunked prefill 把 prefill 切小，每步只多花一点时间（第 2 课）；或者干脆 P/D 分离（第 5 课）。</li></ul><p class="back"><a href="#q-2-1">↑ 回到原文</a></p></article><article class="qa" id="a-2-2"><h4><span class="badge">问 2.2</span></h4><p class="qtext">「为什么不同请求不能共享同一个没写满的 block？」<span class="muted">（大意）</span></p><ul>
+<li>一个 token 在各层的 K、V 不只取决于它自己：从第二层开始，隐藏状态里已经混进了前面所有 token 的信息。所以只有“前文完全相同、本块内容也完全相同”的块，KV 才完全相同。</li>
+<li>块哈希因此是链式的：每块的哈希都包含前一块的哈希。</li>
+<li>system prompt 的最后半个块里，后半部分已经是各个用户自己的内容，KV 各不相同，不能共享。</li></ul><p class="back"><a href="#q-2-2">↑ 回到原文</a></p></article><article class="qa" id="a-2-3"><h4><span class="badge">问 2.3</span></h4><p class="qtext">「cache_salt 的作用范围是什么？应该由谁来设置？」<span class="muted">（大意）</span></p><ul>
+<li>salt 定义了一个“信任组”：带相同 salt 的请求之间才可能命中彼此的缓存；salt 不同，即使文本完全相同也不会命中。</li>
+<li>粒度按信任边界定：按租户，或者细到按用户（同一租户下的终端用户彼此也不可信时）。</li>
+<li>必须由网关根据认证后的身份注入，不能让客户端自己填——否则攻击者可以填上受害者的 salt，照样做计时侧信道攻击。</li>
+<li>salt 只要混进第一块的哈希，后面整条哈希链都会跟着变（第 5 课思考题 3）。</li></ul><p class="back"><a href="#q-2-3">↑ 回到原文</a></p></article><h3 class="grp">第 3 课 · 单卡优化</h3><article class="qa" id="a-3-1"><h4><span class="badge">问 3.1</span></h4><p class="qtext">「分块计算 softmax，为什么结果和整行一起算完全一样？」<span class="muted">（大意）</span></p><ul>
+<li>softmax 需要整行的最大值和指数和。分块时，每块先用块内最大值算出局部结果，同时记下 (m, l)。</li>
+<li>合并时，把各块的指数和“换算”到同一个最大值下，也就是乘上 exp(m<sub>i</sub> − m)。这是恒等变形，不是近似：</li></ul><pre class="f">整行：l = Σ exp(s − m)
+        = exp(m1 − m) · Σ块1 exp(s − m1) + exp(m2 − m) · Σ块2 exp(s − m2)
+        = exp(m1 − m) · l1 + exp(m2 − m) · l2
+输出同理：o = Σ exp(s − m) · v / l
+            = [exp(m1 − m) · l1 · o1 + exp(m2 − m) · l2 · o2] / l</pre><p>好处是不必把整行分数存下来，一块一块流过片上 SRAM 就行；减去最大值也保证了数值稳定。</p><p class="back"><a href="#q-3-1">↑ 回到原文</a></p></article><article class="qa" id="a-3-2"><h4><span class="badge">问 3.2</span></h4><p class="qtext">「speculative decoding的公式推导格式不对，没有正确展示；第三步“等比数列求和”这一段显示不完全」</p><p>完整推导：</p><pre class="f">设每个草稿 token 被接受的概率都是 α，一次猜 k 个。
+验证时从第一个开始逐个检查，遇到第一个被拒绝的就停下，由大模型在这个位置补一个 token；
+k 个全被接受时，大模型额外再生成一个。
+
+第一步：这一步产出的 token 数 = 被接受的前缀长度 + 1
+第二步：前 i 个都被接受的概率是 α<sup>i</sup>，所以
+        期望产出 = 1 + α + α<sup>2</sup> + … + α<sup>k</sup>
+第三步：等比数列求和
+        设    S = 1 + α + α<sup>2</sup> + … + α<sup>k</sup>
+        那么 αS =     α + α<sup>2</sup> + … + α<sup>k</sup> + α<sup>k+1</sup>
+        两式相减：S − αS = 1 − α<sup>k+1</sup>
+        所以：     S = (1 − α<sup>k+1</sup>) / (1 − α)
+
+例：α = 0.8，k = 4：S = (1 − 0.8<sup>5</sup>) / 0.2 = (1 − 0.32768) / 0.2 ≈ 3.36</pre><p class="back"><a href="#q-3-2">↑ 回到原文</a></p></article><h3 class="grp">第 4 课 · 分布式推理与 MoE</h3><article class="qa" id="a-4-1"><h4><span class="badge">问 4.1</span></h4><p class="qtext">「DP/TP/PP/EP是什么的缩写？」</p><ul>
+<li><b>DP</b>：Data Parallelism，数据并行</li>
+<li><b>TP</b>：Tensor Parallelism，张量并行</li>
+<li><b>PP</b>：Pipeline Parallelism，流水线并行</li>
+<li><b>EP</b>：Expert Parallelism，专家并行（只用于 MoE）</li></ul><p class="back"><a href="#q-4-1">↑ 回到原文</a></p></article><article class="qa" id="a-4-2"><h4><span class="badge">问 4.2</span></h4><p class="qtext">「抱歉，帮我回想一下这个细节。prefill阶段算力是瓶颈，所以TTFT的下限大概是2*k*d*d*权重精度字节数/算力。（K维度是k*d, V维度是d*d）decode阶段显存带宽是瓶颈，TPOT的下限应该等于生成一个token所需的显存/带宽。为什么是用权重字节数作为被除数呢？权重不是只需要load一次吗？」</p><ul>
+<li><b>权重并不会留在芯片上</b>：GPU 的片上存储（H100 的 L2 缓存 50 MB，加上各 SM 的共享内存和寄存器，合计也只有一百多 MB）远放不下 8B 的 16 GB、70B 的 141 GB 权重。权重平时待在显存（HBM）里，每生成一个 token，都要把全部权重从 HBM 搬进计算单元一遍——不是只读一次。</li>
+<li>所以 decode 每步时间下限 ≈（全部权重字节 + 这一步要读的全部 KV 字节）÷ 显存带宽。batch 里的多个请求可以共用这一次读取，这正是加大 batch 能提高吞吐的原因。</li>
+<li><b>prefill 的下限公式要改一下</b>：计算量只看乘加次数，约为 2 × 参数量 × prompt 的 token 数，再除以峰值算力；不需要乘“权重精度字节数”——字节数决定的是读数据的时间，不是计算量。</li></ul><p class="back"><a href="#q-4-2">↑ 回到原文</a></p></article><article class="qa" id="a-4-3"><h4><span class="badge">问 4.3</span></h4><p class="qtext">「解释一下TP里的每一层是指什么？以transformer based模型为例，每一层对应softmax（Q*K*缩放）*Vt的哪一个？」</p><ul>
+<li>“每一层”指一个完整的 Transformer 层（block），不是 attention 里的某一个矩阵乘：一层 = attention 块 + MLP 块（再加上各自的 RMSNorm 和残差）。softmax(QKᵀ/√d)·V 只是 attention 块中间的一步。</li>
+<li>TP 在每一层内部切：attention 块按 head 切，每张卡负责一部分 head，各自算 Q、K、V、softmax 和加权求和（不同 head 之间互不依赖），再乘自己那一份 W_O，最后 all-reduce；MLP 块按“W_up 按列、W_down 按行”切，最后 all-reduce。</li></ul><p class="back"><a href="#q-4-3">↑ 回到原文</a></p></article><article class="qa" id="a-4-4"><h4><span class="badge">问 4.4</span></h4><p class="qtext">「理论上每一层的输入应该是上一层完整的输出对吗？那在TP里是不是每个GPU都要先算完第i层的部分输出，然后所有gpu的输出汇总成完整的输出，再执行下一层？」</p><p>对。每一块都需要完整的输入，TP 的切法保证了这一点：</p><pre class="f">attention 块：各卡算自己那部分 head → 各得一份“部分和”
+  → all-reduce：把各卡的部分和加起来，并让每张卡都拿到完整结果
+MLP 块：      各卡用完整输入算自己那一份 → 部分和
+  → all-reduce
+→ 进入下一层（每层 2 次 all-reduce）</pre><p>all-reduce = 求和 + 广播。它是一个同步点，所以每层的通信时间直接加在每一步上，TP 要放在 NVLink 这类高速互联上。</p><p class="back"><a href="#q-4-4">↑ 回到原文</a></p></article><article class="qa" id="a-4-5"><h4><span class="badge">问 4.5</span></h4><p class="qtext">「哦所以attention特指QKV的计算，然后一层包含attention以及一个全连接网络（就是那个升维激活降维）？」</p><p>基本对，补充两点：</p><ul>
+<li>attention 块不只是算 Q、K、V，还包括 softmax 加权求和和输出投影 W_O。</li>
+<li>MLP 就是“升维、激活、降维”；Llama 用的 SwiGLU 多一个门控矩阵 W_gate。另外，每个块前面有 RMSNorm，后面有残差连接。</li></ul><p class="back"><a href="#q-4-5">↑ 回到原文</a></p></article><article class="qa" id="a-4-6"><h4><span class="badge">问 4.6</span></h4><p class="qtext">「RMSnorm、输出投影、残差、Wgate是干嘛的？」</p><ul><li><b>RMSNorm</b>：把每个 token 的向量按均方根缩放到稳定的尺度（再乘一个可学习的系数 g），防止数值一层层越传越大或越小。</li></ul><pre class="f">RMSNorm(x) = x / √(mean(x²) + ε) ⊙ g</pre><ul>
+<li><b>输出投影 W_O</b>：把各个 head 的输出拼起来后，用 W_O 再混合回 d 维，让不同 head 的信息互相融合。</li>
+<li><b>残差</b>：把块的输入直接加到输出上（x + f(x)），信息和梯度可以绕过这一块直接往下传，深层网络才训得动。</li>
+<li><b>W_gate</b>：SwiGLU 里的门控。SiLU(x·W_gate) 与 x·W_up 逐元素相乘，决定每个维度“放行多少”，比普通的“升维—激活—降维”效果更好。</li></ul><p class="back"><a href="#q-4-6">↑ 回到原文</a></p></article><article class="qa" id="a-4-7"><h4><span class="badge">问 4.7</span></h4><p class="qtext">「详细解释这个公式的每一个符号」</p><pre class="f">X         这一步输入的激活矩阵：行数 = token 数，列数 = d（隐藏维度）
+W_up      升维矩阵，d × d_ff（d_ff 通常是 d 的几倍）
+act       激活函数（如 SiLU），逐元素计算
+W_down    降维矩阵，d_ff × d
+n         TP 的卡数
+W_up_b    W_up 按列切出的第 b 块，d × (d_ff / n)
+W_down_b  W_down 按行切出的第 b 块，(d_ff / n) × d
+Y         输出，形状和 X 一样</pre><ul>
+<li><b>为什么切开算和不切完全一样</b>：矩阵乘法可以沿中间那一维拆开求和，[A<sub>1</sub> … A<sub>n</sub>] · [B<sub>1</sub>; …; B<sub>n</sub>] = Σ A<sub>b</sub>B<sub>b</sub>。</li>
+<li>act 是逐元素的，所以 act(X·W_up) 的第 b 块列只取决于 W_up_b，每张卡只需要自己那一份；最后 all-reduce 把 n 个部分和加起来，就是完整的 Y。</li></ul><p class="back"><a href="#q-4-7">↑ 回到原文</a></p></article><article class="qa" id="a-4-8"><h4><span class="badge">问 4.8</span></h4><p class="qtext">「GQA是什么」</p><ul>
+<li>GQA（Grouped-Query Attention，分组查询注意力）：把 query head 分成若干组，每组共用一个 K head 和一个 V head。</li>
+<li>它介于两个极端之间：每个 query head 都有自己的 K、V（MHA，标准多头注意力），和所有 query head 共用一组 K、V（MQA）。只有 1 组时就是 MQA，组数等于 head 数时就是 MHA。</li>
+<li>Llama-3.1-8B：32 个 query head、8 个 KV head，KV 是 MHA 的 1/4；70B：64 个 query head、8 个 KV head，KV 是 MHA 的 1/8。质量接近 MHA，KV 小很多，decode 每步要读的数据也少很多。</li></ul><p class="back"><a href="#q-4-8">↑ 回到原文</a></p></article><article class="qa" id="a-4-9"><h4><span class="badge">问 4.9</span></h4><p class="qtext">「EP没太看懂，重讲一次」</p><p>用一个能手算的例子：</p><pre class="f">4 张卡，8 个专家：卡 0 放专家 0、1，卡 1 放专家 2、3，卡 2 放 4、5，卡 3 放 6、7
+每张卡上各有一批 token；每个 token 由路由器选 2 个专家（top-2）
+
+1. 路由：每张卡给自己的 token 算出该去哪两个专家
+2. 分发（all-to-all）：把 token 发到对应专家所在的卡
+3. 计算：每张卡用自己的专家，处理收到的所有 token
+4. 合并（all-to-all）：把结果送回 token 原来所在的卡，按路由权重加权求和</pre><ul>
+<li>好处：每个专家能收集到所有卡送来的 token，batch 变大；权重分散开，每张卡的显存压力小。</li>
+<li>代价：每个 MoE 层两次 all-to-all，跨机时依赖高速网络；专家冷热不均时还要做负载均衡。</li></ul><p class="back"><a href="#q-4-9">↑ 回到原文</a></p></article><article class="qa" id="a-4-10"><h4><span class="badge">问 4.10</span></h4><p class="qtext">「这下看懂了，那卡间通信、机间通信是谁实现的？推理引擎吗」</p><p>分工是：推理引擎决定“什么时候、和谁、交换什么”，具体搬数据交给通信库和硬件。</p><ul>
+<li><b>引擎</b>：比如 TP 每层两次 all-reduce、EP 每层两次 all-to-all、PP 段间收发、P/D 之间传 KV。</li>
+<li><b>通信库</b>：NCCL 做 all-reduce、all-gather 等集合通信；vLLM 等引擎还有自己针对小消息的 all-reduce kernel；DeepEP 专门优化 MoE 的 all-to-all；NVSHMEM 让 GPU 直接读写其他 GPU 的显存；KV 传输用 NIXL、Mooncake 的 Messenger 等。</li>
+<li><b>硬件</b>：机内走 NVLink / NVSwitch；机间走 InfiniBand 或 RoCE 网卡，配合 GPUDirect RDMA 让网卡直接读写显存（第 5 课问 5.3）。</li></ul><p class="back"><a href="#q-4-10">↑ 回到原文</a></p></article><h3 class="grp">第 5 课 · 集群层</h3><article class="qa" id="a-5-1"><h4><span class="badge">问 5.1</span></h4><p class="qtext">「这个dynamo的算法为何只考虑decode的负载？prefill的负载不用考虑吗？」</p><ul>
+<li>要考虑，Dynamo 也考虑了。第 5 课最初把公式写简化了：prefill 项不只是新请求要新算的块，还包括这个实例上已经分过来、还没算完的 prefill（积压）。请求输出第一个 token 时，它的 prompt 才从积压里扣掉。</li>
+<li>文档的例子里刚好没有积压，看上去就像只算了 decode 负载。给实例 2 加上 12 块积压，选择就会从实例 2 变成实例 3（见正文的例子）。</li>
+<li>两项各管一个瓶颈：prefill 项对应算力，影响新请求自己的 TTFT；decode 项（活跃 KV 块数）对应显存带宽和容量，影响这个实例上所有请求的 ITL。</li>
+<li>P/D 分离后才“各算各的”：prefill 池的路由只看 prefill 项，decode 池只看活跃 KV 块、不看缓存命中。</li>
+<li>其他做法：Mooncake 直接估算 TTFT（排队时间 + 本次 prefill 时间 + 需要时的 KV 传输时间）；llm-d 用多个打分器加权（前缀命中、队列长度、KV 占用率等）。</li></ul><p class="back"><a href="#q-5-1">↑ 回到原文</a></p></article><article class="qa" id="a-5-2"><h4><span class="badge">问 5.2</span></h4><p class="qtext">「算完一层是什么意思？」</p><ul>
+<li>“一层”指模型的一层（Transformer 层），不是 KV 块，也不是 chunked prefill 的一段 token。</li>
+<li>prefill 时，所有 prompt token 一起从第 1 层算到第 80 层；第 i 层的 K、V 只取决于第 i 层的输入，算完后不会再变，所以可以马上交给网卡发走，GPU 接着算下一层。</li></ul><pre class="f">70B，TP=8，4K prompt，每张卡一张 50 GB/s 网卡：
+  每层计算约 0.948 ms；每层每卡要发 2.10 MB，约 0.042 ms
+  不重叠：  75.85 + 3.36  ≈ 79.2 ms
+  逐层重叠：75.85 + 0.042 ≈ 75.9 ms（只剩最后一层的传输露在外面）</pre><ul>
+<li>计算用 GPU 的计算单元，发送由网卡借助 GPUDirect RDMA 直接读显存，是两套硬件；prefill 受算力限制，显存带宽还有富余，所以能同时进行。</li>
+<li>实现上：Mooncake 逐层加载、逐层存储；vLLM 的 KV connector 接口有逐层的钩子（save_kv_layer、wait_for_layer_load）。但 vLLM 的 NixlConnector 默认是 prefill 全部算完后，再由 decode 实例把 KV 拉过去，并不逐层发<span class="ts" title="有时效性：基于 2026 年 10 月的硬件、模型或软件版本">时效</span>。2026 年 10 月 vLLM 又介绍了由 prefill 端主动推送 KV 的 NIXL push connector（见延伸阅读）。</li>
+<li>逐层发的前提是 prefill 开始前就选好 decode 实例、分配好接收的块；推迟到 prefill 之后再选 decode 实例，路由更灵活。</li></ul><p class="back"><a href="#q-5-2">↑ 回到原文</a></p></article><article class="qa" id="a-5-3"><h4><span class="badge">问 5.3</span></h4><p class="qtext">「RDMA就是GPU直接读网卡？怎么比SSD快这么多？GPU不能直接读SSD吗？」</p><ul>
+<li><b>RDMA 不是 GPU 去读网卡</b>，而是网卡直接读写内存：本机网卡直接从远端机器的内存取数据，再直接写进本机显存（这一步叫 GPUDirect RDMA）。两端的 CPU 都不参与搬运，也没有中间拷贝。</li>
+<li><b>远端池快，是因为另一头不是一块盘</b>：数据放在很多台机器的内存里（Mooncake），或分散在成百上千块 SSD 上（3FS），一起往外送，瓶颈落在本机网卡的 50 GB/s。而一块 NVMe SSD 只接 4 条 PCIe 通道：PCIe 4.0 x4 上限约 7.9 GB/s，5.0 x4 约 15.8 GB/s。</li>
+<li>3FS 的实测：180 个存储节点、每个节点 16 块 NVMe SSD，总读吞吐约 6.6 TiB/s，平均每节点约 37.5 GiB/s；作 KV cache 时，每台客户端一张 400 Gb/s 网卡，峰值读吞吐能到 40 GiB/s。</li>
+<li><b>GPU 可以直接读 SSD</b>：GPUDirect Storage（GDS）让 SSD 的 DMA 直接写进显存，省掉 CPU 内存里的中转，但快不过那块 SSD 本身；想更快只能多块盘一起读。</li>
+<li>注意前提：第 5 课表里“远端 50 GB/s”假设远端足够大、能把网卡喂满；如果远端只有一块 SSD，走 RDMA 也只有那块盘的速度。按 PCIe 4.0 x4 的上限算，至少要 7 块盘一起读，才喂得满一张 400G 网卡。</li></ul><p class="back"><a href="#q-5-3">↑ 回到原文</a></p></article><h3 class="grp">第 6 课 · 生产化</h3><article class="qa" id="a-6-1"><h4><span class="badge">问 6.1</span></h4><p class="qtext">「ITL是啥缩写？」</p><p>ITL 是 <b>Inter-Token Latency</b>（token 间延迟）：流式输出时，相邻两次输出之间隔了多久。几个常一起出现的缩写：</p>
+<table><thead><tr><th>缩写</th><th>全称</th><th>衡量什么</th></tr></thead><tbody>
+<tr><td>TTFT</td><td>Time To First Token</td><td>从请求到达，到第一个 token 出来</td></tr>
+<tr><td>ITL</td><td>Inter-Token Latency</td><td>相邻两次输出之间的间隔</td></tr>
+<tr><td>TPOT</td><td>Time Per Output Token</td><td>一个请求平均每个输出 token 花的时间</td></tr>
+<tr><td>E2E</td><td>End-to-End latency</td><td>从请求到达，到最后一个 token 出来</td></tr>
+</tbody></table><pre class="f">ITL： 每两次相邻输出之间记一个样本
+TPOT：每个请求结束时算一次
+      TPOT = (E2E 延迟 − TTFT) / (输出 token 数 − 1)</pre><p>每次输出只含 1 个 token 时两者近似相等；一次输出含多个 token（比如投机解码一次接受好几个）时就不一样。从用户角度看：TTFT 决定多久开始回答，ITL 决定回答吐字有多快。</p><p class="back"><a href="#q-6-1">↑ 回到原文</a></p></article><article class="qa" id="a-6-2"><h4><span class="badge">问 6.2</span></h4><p class="qtext">「MFU是啥？」</p><p>MFU 是 <b>Model FLOPs Utilization</b>（模型算力利用率）：模型实际完成的有效计算量，占硬件峰值算力的比例。</p><pre class="f">MFU = 模型实际完成的有效计算量（FLOP/s） / 硬件峰值算力（FLOP/s）
+例：H100 的 BF16 峰值是 989.4 TFLOPS，MFU 50% 表示实际只用到约 494.7 TFLOPS</pre><ul>
+<li>到不了 100%：kernel 效率有限、要等显存读写、TP 通信、调度空隙，都会吃掉一部分算力。</li>
+<li>它和 nvidia-smi 的 GPU 利用率不是一回事：后者只看“有没有 kernel 在跑”，MFU 看的是“真正做了多少有用的计算”。</li></ul><p class="back"><a href="#q-6-2">↑ 回到原文</a></p></article><article class="qa" id="a-6-3"><h4><span class="badge">问 6.3</span></h4><p class="qtext">「你这个单位换算正确吗？？」</p><p>换算是对的。容易起疑，是因为 141.2 这个数出现了两次：权重 141.2 GB，每个 token 的计算量 141.2 GFLOP。两者单位不同，只是恰好都等于 2 × 70.6B。</p><pre class="f">70.6B 的 B 是 billion（10 亿个参数），不是字节；GFLOP 的 G 也是 10 亿
+每个 token 的计算量：2 FLOP/参数 × 70.6e9 个参数 = 141.2e9 FLOP = 141.2 GFLOP
+权重的大小（BF16）：  2 字节/参数 × 70.6e9 个参数 = 141.2e9 字节 = 141.2 GB</pre><ul>
+<li>每个参数 2 FLOP：每个权重对每个 token 做一次乘法、一次加法。权重“乘 2”则是因为 BF16 每个参数占 2 字节。两个“2”含义不同，数值相同纯属巧合。</li>
+<li>FLOP 是运算次数，FLOPS（FLOP/s）是每秒运算次数；运算次数和 GB 一样按 1000 进制，只有 KiB、MiB 这类是 1024 进制。</li></ul><p class="back"><a href="#q-6-3">↑ 回到原文</a></p></article><h3 class="grp">第 7 节 · 新架构与新负载</h3><article class="qa" id="a-7-1"><h4><span class="badge">问 7.1</span></h4><p class="qtext">「我可以把transformer结构等同于attention吗？」</p><p>不能。attention 是 Transformer 的一个部件（最关键的创新），负责 token 之间交换信息；每层另有一块 MLP 负责每个 token 各自加工，而且参数大头在 MLP（Llama-3.1-8B：attention 16.7%、MLP 70.2%、embedding 13.1%）。对推理来说，KV cache 只来自 attention，读权重主要读的是 MLP。详见<a href="#s7-1">正文 7.1</a>。</p><p class="back"><a href="#q-7-1">↑ 回到原文</a></p></article><article class="qa" id="a-7-2"><h4><span class="badge">问 7.2</span></h4><p class="qtext">「那2025年之后的主流模型都是transformer架构吗？」</p><p>骨架基本都是，但“每层都是标准 attention”已经不是唯一主流。大模型的 MLP 大多换成了 MoE；attention 分成三条路线：标准（gpt-oss、MiniMax M2）、稀疏或压缩（DeepSeek-V3.2、DeepSeek-V4）、混合线性（Qwen3-Next、Qwen3.5、Kimi Linear、Nemotron 3）。混合架构仍保留少数 full attention 层，MiniMax M2 还从混合退回了全 full attention。闭源旗舰大多不公开这些细节。详见<a href="#s7-2">正文 7.2</a>。</p><p class="back"><a href="#q-7-2">↑ 回到原文</a></p></article><article class="qa" id="a-7-3"><h4><span class="badge">问 7.3</span></h4><p class="qtext">「因为我感觉这个课程学习下来好像LLM推理系统都是围绕attention也就是KV设计的，如果是这样的话我想问换个不用attention的模型，或者attention变种，那LLM推理系统需要改变吗？」</p><p>要改大约一半。和权重、调度有关的（roofline、continuous batching、量化、TP/EP、P/D 分离的出发点、扩缩容）基本不变；围绕 KV 的（PagedAttention、前缀缓存、投机解码的回退、P/D 传 KV、分层存储）要扩展，因为状态是固定大小、原地覆盖、不能截断成更短前缀的。attention 变种看它改了 KV 的哪个性质：只改大小（GQA、MLA）几乎不用动，滑动窗口和稀疏或压缩 attention 会多出新的缓存规则。详见<a href="#s7-3">正文 7.3</a>。</p><p class="back"><a href="#q-7-3">↑ 回到原文</a></p></article><article class="qa" id="a-7-4"><h4><span class="badge">问 7.4</span></h4><p class="qtext">「实际使用agent时1M的context长度比较常见，还会进行上下文压缩，这个是属于客户端的优化还是推理引擎的优化？」</p><p>两边都有，但是两件事。agent 的上下文压缩（写摘要、删旧工具输出、子 agent）在客户端或 API 层，减少的是 token；引擎和模型做的是 KV 压缩（量化、卸载、MLA、稀疏 attention），token 不变。两层通过前缀缓存相连：客户端让上下文只追加、少改历史，引擎才能复用 KV；压缩本身会让缓存失效，所以要少做、每次做得彻底。详见<a href="#s7-4">正文 7.4</a>。</p><p class="back"><a href="#q-7-4">↑ 回到原文</a></p></article><article class="qa" id="a-7-5"><h4><span class="badge">问 7.5</span></h4><p class="qtext">「那么是否可以说这次LLM推理系统学习笔记还算通用？」</p><p>可以，但要分层次看：分析方法和系统骨架最通用；KV 相关机制对 attention 层仍然适用，混合架构要扩展成“KV + 状态”；硬件数字、模型例子、框架接口和默认行为有时效性，正文里标了<span class="ts">时效</span>。详见<a href="#s7-5">正文 7.5</a>。</p><p class="back"><a href="#q-7-5">↑ 回到原文</a></p></article></section><section id="reading"><h2>延伸阅读</h2><h3 class="grp">第 1 课 · 推理基础</h3><ul class="reading"><li><a href="https://arxiv.org/abs/2211.05102">Efficiently Scaling Transformer Inference（Pope 等，2022）</a>：用一个分析模型推导大模型推理的显存、带宽和切分取舍，MFU 的说法也来自这类分析</li><li><a href="https://arxiv.org/abs/2402.16363">LLM Inference Unveiled: Survey and Roofline Model Insights（2024）</a>：用 roofline 模型系统分析 LLM 推理为什么受显存带宽限制</li></ul><h3 class="grp">第 2 课 · 推理引擎</h3><ul class="reading"><li><a href="https://www.usenix.org/conference/osdi22/presentation/yu">Orca（OSDI ’22）</a>：迭代级调度，continuous batching 的出处</li><li><a href="https://arxiv.org/abs/2309.06180v1">Efficient Memory Management for LLM Serving with PagedAttention（SOSP ’23）</a>：vLLM 与 PagedAttention 的论文</li><li><a href="https://arxiv.org/pdf/2308.16369">SARATHI（2023）</a>：chunked prefill：把 prefill 切块，和 decode 拼在同一步里</li><li><a href="https://docs.vllm.ai/en/v0.20.1/configuration/optimization/">vLLM 文档：Optimization and Tuning</a>：抢占、chunked prefill 等参数怎么调</li></ul><h3 class="grp">第 3 课 · 单卡优化</h3><ul class="reading"><li><a href="https://arxiv.org/abs/2205.14135v2">FlashAttention（2022）</a>：分块 + online softmax，减少 attention 的显存读写</li><li><a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding（2022）</a>：投机解码，含接受率与期望产出的推导</li><li><a href="https://arxiv.org/abs/2306.00978">AWQ（MLSys 2024）</a>：常用的 weight-only 低比特量化方法</li></ul><h3 class="grp">第 4 课 · 分布式推理与 MoE</h3><ul class="reading"><li><a href="https://arxiv.org/pdf/1909.08053">Megatron-LM（2019）</a>：张量并行的经典论文：MLP 按列、按行切，attention 按 head 切</li><li><a href="https://arxiv.org/abs/2305.13245">GQA（2023）</a>：分组查询注意力</li><li><a href="https://arxiv.org/pdf/2412.19437">DeepSeek-V3 Technical Report</a>：细粒度 MoE、MLA，以及大规模 EP 的推理部署</li><li><a href="https://raw.githubusercontent.com/deepseek-ai/open-infra-index/main/202502OpenSourceWeek/day_6_one_more_thing_deepseekV3R1_inference_system_overview.md">DeepSeek-V3/R1 推理系统概览</a>：线上的 P/D 分离、EP 规模与成本数据</li><li><a href="https://docs.sglang.io/docs/advanced_features/dp_dpa_smg_guide">SGLang：DP Attention 指南</a>：attention 用 DP、MoE 用 EP 的组合部署</li></ul><h3 class="grp">第 5 课 · 集群层</h3><ul class="reading"><li><a href="https://www.usenix.org/conference/osdi24/presentation/zhong-yinmin">DistServe（OSDI ’24）</a>：prefill 与 decode 分离，按 goodput 分别配置</li><li><a href="https://www.microsoft.com/en-us/research/publication/splitwise-efficient-generative-llm-inference-using-phase-splitting/">Splitwise（Microsoft Research）</a>：按阶段拆分到不同机器</li><li><a href="https://arxiv.org/html/2407.00079">Mooncake（2024）</a>：以 KV cache 为中心的分离式架构</li><li><a href="https://docs.nvidia.com/dynamo/knowledge-base/modular-components/router/router-design">NVIDIA Dynamo：Router design</a>：KV 感知路由的代价函数（问 5.1）</li><li><a href="https://docs.nvidia.com/dynamo/knowledge-base/modular-components/router/disaggregated-serving">NVIDIA Dynamo：Disaggregated serving</a>：P/D 分离模式下两个池各自怎么路由</li><li><a href="https://github.com/llm-d/llm-d/blob/main/guides/precise-prefix-cache-routing/README.md">llm-d：Precise prefix-cache routing</a>：按 KV 事件维护全局前缀索引</li><li><a href="https://developers.redhat.com/articles/2025/10/07/master-kv-cache-aware-routing-llm-d-efficient-ai-inference">Red Hat：KV cache aware routing with llm-d</a>：llm-d 路由的实践介绍</li><li><a href="https://docs.vllm.ai/en/v0.32.0/features/disagg_prefill/">vLLM：Disaggregated prefilling</a>：vLLM 的 P/D 分离</li><li><a href="https://docs.vllm.ai/en/v0.14.1/features/nixl_connector_usage/">vLLM：NixlConnector</a>：用 NIXL 在实例之间传 KV</li><li><a href="https://vllm-project.github.io/2026/10/14/nixl-push-connector.html">vLLM 博客：NIXL push connector（2026 年 10 月）</a>：由 prefill 端主动推送 KV 的模式（问 5.2）</li><li><a href="https://docs.vllm.ai/en/latest/api/vllm/distributed/kv_transfer/kv_connector/v1/base/">vLLM：KV connector 接口</a>：逐层保存、加载 KV 的钩子</li><li><a href="https://docs.vllm.ai/en/stable/features/kv_offloading_usage/">vLLM：KV offloading</a>：把 KV 卸载到 CPU 内存</li><li><a href="https://arxiv.org/pdf/2510.09665">LMCache（2025）</a>：独立的 KV cache 层，可跨实例共享</li><li><a href="https://github.com/deepseek-ai/3FS/blob/main/README.md">3FS README</a>：DeepSeek 的分布式文件系统与 KV cache 实测吞吐（问 5.3）</li><li><a href="https://docs.nvidia.com/gpudirect-storage/overview-guide/index.html">NVIDIA GPUDirect Storage 概览</a>：SSD 直接 DMA 到显存</li><li><a href="https://docs.lmcache.ai/kv_cache/storage_backends/gds.html">LMCache：GDS 后端</a>：用 GDS 读写 KV</li></ul><h3 class="grp">第 6 课 · 生产化</h3><ul class="reading"><li><a href="https://docs.nvidia.com/dynamo/v1.5.1/knowledge-base/modular-components/planner/overview">NVIDIA Dynamo Planner</a>：按 TTFT、ITL 目标分别扩缩 prefill 和 decode 池</li><li><a href="https://docs.vllm.ai/en/latest/design/metrics/">vLLM：Metrics 设计</a>：TTFT、ITL、排队、KV 占用、抢占等指标</li><li><a href="https://docs.vllm.ai/en/latest/usage/security/">vLLM：Security</a>：部署时的安全建议</li><li><a href="https://www.usenix.org/conference/osdi24/presentation/sheng">Fairness in Serving LLMs / VTC（OSDI ’24）</a>：按 token 计费的公平调度</li><li><a href="https://www.ndss-symposium.org/ndss-paper/i-know-what-you-asked-prompt-leakage-via-kv-cache-sharing-in-multi-tenant-llm-serving/">PromptPeek（NDSS）</a>：通过 KV 共享泄露其他租户的 prompt</li><li><a href="https://github.com/kubernetes-sigs/gateway-api-inference-extension/blob/main/site-src/concepts/priority-and-capacity.md">Gateway API Inference Extension：Priority and capacity</a>：按优先级排队与丢弃</li><li><a href="https://llm-d.ai/docs/architecture/router/flow-control">llm-d：Flow control</a>：过载时的排队与公平</li><li><a href="https://docs.vllm.ai/en/latest/features/sleep_mode/">vLLM：Sleep mode</a>：释放显存、快速唤醒的热备</li><li><a href="https://docs.vllm.ai/en/latest/models/extensions/runai_model_streamer/">vLLM：Run:ai Model Streamer</a>：边下载边加载权重，缩短冷启动</li><li><a href="https://docs.vllm.ai/en/latest/examples/observability/opentelemetry/">vLLM：OpenTelemetry 示例</a>：请求级追踪</li><li><a href="https://blog.trailofbits.com/2024/01/16/leftoverlocals-listening-to-llm-responses-through-leaked-gpu-local-memory/">LeftoverLocals（Trail of Bits，2024）</a>：通过残留的 GPU 本地内存窃听 LLM 输出</li><li><a href="https://docs.nvidia.com/deploy/nvml-api/structnvmlUtilization__t.html">NVML：nvmlUtilization_t</a>：GPU 利用率的官方定义：只看采样周期内有没有 kernel 在跑</li></ul><h3 class="grp">第 7 节 · 新架构与新负载</h3><ul class="reading"><li><a href="https://qwen.ai/blog?id=qwen3-next">Qwen3-Next 官方博客（2025）</a>：混合 attention（Gated DeltaNet + gated attention）、高稀疏 MoE、MTP</li><li><a href="https://arxiv.org/html/2510.26692">Kimi Linear（2025）</a>：KDA 与 MLA 按层混合，KV cache 最多减少 75%</li><li><a href="https://huggingface.co/blog/MiniMax-AI/why-did-m2-end-up-as-a-full-attention-model">Why Did MiniMax M2 End Up as a Full Attention Model?</a>：为什么从混合 attention 退回全 full attention</li><li><a href="https://github.com/deepseek-ai/DeepSeek-V3.2-Exp">DeepSeek-V3.2-Exp</a>：DeepSeek Sparse Attention（DSA）</li><li><a href="https://arxiv.org/html/2606.19348v1">DeepSeek-V4 技术报告（2026）</a>：CSA + HCA 混合压缩 attention、mHC、1M 上下文</li><li><a href="https://arxiv.org/html/2512.20856">NVIDIA Nemotron 3 白皮书</a>：Mamba-Transformer 混合 MoE</li><li><a href="https://arxiv.org/pdf/2508.10925">gpt-oss 模型卡</a>：OpenAI 开源权重的 MoE Transformer</li><li><a href="https://docs.vllm.ai/en/latest/design/hybrid_kv_cache_manager/">vLLM：Hybrid KV Cache Manager</a>：按层类型分配缓存槽位、按层定前缀命中规则</li><li><a href="https://arxiv.org/abs/2411.19379">Marconi（MLSys 2025）</a>：混合模型的前缀缓存：检查点存在哪里、留哪些</li><li><a href="https://pytorch.org/blog/hybrid-models-meet-sglang-more-than-full-attention/">Hybrid Models Meet SGLang（PyTorch 博客）</a>：SGLang 如何支持 Mamba / 线性 attention 混合模型</li><li><a href="https://www.lmsys.org/blog/2026-08-11-unified-radix-cache">SGLang Unified Radix Cache（LMSYS，2026）</a>：一棵前缀树管理 full attention、滑动窗口和状态三类缓存</li><li><a href="https://www.anthropic.com/research/effective-context-engineering-for-ai-agents">Anthropic：Effective context engineering for AI agents</a>：context rot、compaction、笔记、子 agent</li><li><a href="https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus">Manus：Context Engineering for AI Agents</a>：围绕 KV-cache 命中率设计 agent 的上下文</li><li><a href="https://platform.claude.com/docs/en/build-with-claude/compaction">Claude 文档：Compaction</a>：服务端的摘要式压缩</li><li><a href="https://platform.claude.com/docs/en/build-with-claude/context-editing">Claude 文档：Context editing</a>：清除旧工具结果，以及它和 prompt caching 的关系</li><li><a href="https://developers.openai.com/api/docs/guides/compaction">OpenAI 文档：Compaction</a>：Responses API 的服务端压缩</li><li><a href="https://docs.vllm.ai/en/stable/features/quantization/quantized_kvcache/">vLLM：Quantized KV Cache</a>：FP8 KV cache</li></ul></section>
+</main>
+<footer>根据 2026 年 10 月 27–29 日的学习对话整理。数字均按文中条件估算，实际部署请以实测为准。</footer>
+</div>
+</body>
+</html>
