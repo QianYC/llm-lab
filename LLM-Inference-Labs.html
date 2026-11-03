@@ -80,20 +80,23 @@ footer{color:var(--muted);font-size:.88rem;margin-block-start:48px;border-block-
 .lab h3{color:var(--accent)}
 .goal{background:var(--ex-bg);border-inline-start:4px solid var(--ex-border);border-radius:6px;padding:8px 12px;margin:10px 0}
 .todo-later{color:var(--muted);font-size:.9rem}
+details{border:1px solid var(--border);border-radius:6px;padding:4px 12px;margin:10px 0}
+summary{cursor:pointer;color:var(--accent);font-weight:600}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
 <h1>LLM 推理引擎动手实验课</h1>
-<p class="sub">在 AMD RX 7800 XT 上从零写一个推理引擎 · Ubuntu 26.04.1 + ROCm 10.1.0 + PyTorch 2.14.0 · 2026 年 10 月 30 日更新</p>
+<p class="sub">在 AMD RX 7800 XT 上从零写一个推理引擎 · Ubuntu 26.04.1 + ROCm 10.1.0 + PyTorch 2.14.0 · 2026 年 10 月 31 日更新</p>
 <div class="note">
 <p><b>怎么用：</b></p>
 <ul>
 <li><b>10 月 30 日更新</b>：实验 0 按 AMD 官方文档 ROCm 10.1.0（Ubuntu 26.04.1）重写：新的驱动和 ROCm 软件源、PyTorch 2.14.0；GPU 权限改用 udev 规则；ROCm 改装完整套件，并补充了磁盘空间预算。旧版的 ROCm 7.2.1 装法作废。</li>
+<li><b>10 月 31 日更新</b>：实验 1 改写成第 0–8 步，加了代码骨架、和 HF 逐个模块对齐的检查脚本、折叠起来的参考实现和常见坑汇总；完成标准改为 FP32 下和 HF 完全一致、BF16 下 top-1 一致率 99% 以上。实验 0 的预期结果按实测更新。</li>
 <li>按理论课的顺序推进，每个实验对应前面的某一课。单卡能做的都在 7800 XT 上完成；需要多卡的部分（实验 4 的可选项）租 NVIDIA 云 GPU。</li>
 <li>一次做一个实验：做完把输出和思考题答案贴到对话里，分析完再进入下一个。</li>
-<li>实验 0 已给出完整步骤和脚本；实验 1–7 先列出目标、要做的事和完成标准，逐步的代码框架做到时再补充。</li>
+<li>实验 0、1 已给出完整步骤和代码；实验 2–7 先列出目标、要做的事和完成标准，做到时再补充同样详细的步骤。</li>
 <li><span class="ts">时效</span> 标着它的版本号和命令基于 2026 年 10 月的软件，以后升级时以 AMD 官方文档为准。</li>
 <li>配套理论笔记：LLM-Inference-Notes.html。</li>
 </ul>
@@ -114,7 +117,7 @@ footer{color:var(--muted);font-size:.88rem;margin-block-start:48px;border-block-
 </ol></nav>
 </header><main><section id="overview"><h2>课程总览</h2><table><thead><tr><th>实验</th><th>实现或测量什么</th><th>对应理论课</th><th>完成标准</th></tr></thead><tbody>
 <tr><td><a href="#lab0">0 环境与基线</a></td><td>装好 Ubuntu、ROCm、PyTorch；测带宽、算力和屋脊点；跑 Hugging Face 版 Qwen3-0.6B 作为基线</td><td>第 1 课</td><td>得到自己显卡的 roofline；记下基线的 TTFT 和 TPOT</td></tr>
-<tr><td><a href="#lab1">1 手写模型</a></td><td>直接读 safetensors 权重，自己写 Qwen3 的前向（RMSNorm、RoPE、GQA、QK-Norm、SwiGLU），再加 KV cache 和采样</td><td>第 1 课、问 4.x、7.1</td><td>输出和 Hugging Face 一致；对比有无 KV cache 的速度</td></tr>
+<tr><td><a href="#lab1">1 手写模型</a></td><td>直接读 safetensors 权重，自己写 Qwen3 的前向（RMSNorm、RoPE、GQA、QK-Norm、SwiGLU），再加 KV cache 和采样</td><td>第 1 课、问 4.x、7.1</td><td>FP32 下和 HF 完全一致，BF16 下 top-1 一致率 99% 以上；对比有无 KV cache 的速度</td></tr>
 <tr><td><a href="#lab2">2 引擎核心</a></td><td>请求调度、continuous batching、分页 KV（block table）、前缀缓存、抢占、chunked prefill</td><td>第 2 课</td><td>吞吐高于静态 batching；前缀命中后 TTFT 明显下降</td></tr>
 <tr><td><a href="#lab3">3 性能优化</a></td><td>用 Triton 写分页 decode attention 和融合算子；INT8 权重量化（7800 XT 没有 FP8 硬件）；HIP Graph；投机解码（Qwen3-0.6B 当草稿模型，4B 当目标模型）</td><td>第 3 课</td><td>每步 decode 耗时下降；实测加速比和公式对得上</td></tr>
 <tr><td><a href="#lab4">4 并行</a></td><td>在单卡上验证 TP 切分、MoE 的分发与合并在数学上正确；可选：租 2 张卡跑真正的 TP</td><td>第 4 课</td><td>切分后的结果和不切分一致</td></tr>
@@ -379,9 +382,10 @@ print(tok.decode(out[0, n_in:n_in + 40]))</pre>
 <p>运行顺序：<code>python check_env.py</code>，然后 <code>python roofline.py</code>，最后 <code>python hf_baseline.py &lt;roofline.py 测到的带宽&gt;</code>。</p>
 <h4>大致预期</h4>
 <ul>
-<li><code>check_env.py</code>：torch 版本带 <code>+rocm10.1.0</code>；arch 显示 gfx1101；显存约 16 GiB；按 AMD 的说明，PyTorch 2.14 在这类显卡上默认用 hipBLASLt，BLAS 一行应显示 Cublaslt。</li>
+<li><code>check_env.py</code>：torch 版本带 <code>+rocm10.1.0</code>；arch 显示 gfx1101；显存约 16 GiB；Triton 随 PyTorch 一起装好（实测 3.8.0）。BLAS 一行实测显示 Cublas（即 rocBLAS），和 AMD 说的“2.14 起这类显卡默认用 hipBLASLt”不一致；想对比可以加环境变量 <code>TORCH_BLAS_PREFER_HIPBLASLT=1</code> 再跑。</li>
 <li><code>roofline.py</code>：带宽接近但低于标称的 624 GB/s；BF16 矩阵乘达不到标称的 74.65 TFLOPS，这是正常的；按标称参数算，屋脊点约 120 FLOP/字节（H100 是 295）。扫描 batch 大小时，B 很小的阶段耗时几乎不变（带宽瓶颈），越过屋脊点附近以后耗时开始随 B 线性增长。</li>
-<li><code>hf_baseline.py</code>：实测 TPOT 可能比带宽上限慢很多，原因留给思考题 3。</li>
+<li><code>hf_baseline.py</code>：实测 TPOT 可能比带宽上限慢很多，原因留给思考题 3。会出现 “Mem Efficient attention … still experimental” 的警告，说明 SDPA 退回了 math 实现，属于正常现象；生成的文本会重复 prompt 里的句子，不影响测速。</li>
+<li><b>不要去掉预热</b>：第一次调用会带上一次性的初始化开销（加载 kernel、库初始化、首次分配显存等）。去掉预热后，这部分会算进 TTFT，还会让按“两次运行相减”算出的 TPOT 偏小。</li>
 </ul>
 <h4>思考题</h4>
 <ol>
@@ -390,31 +394,261 @@ print(tok.decode(out[0, n_in:n_in + 40]))</pre>
 <li>Hugging Face 基线的 TPOT 比带宽上限慢了多少倍？时间花在哪里？提示：用 <code>torch.profiler</code> 看一个 decode 步里有多少个 kernel，以及 GPU 有多少时间在空等。</li>
 </ol>
 <p><b>交付：</b>三个脚本的完整输出 + 思考题答案。</p>
-</section><section class="lab" id="lab1"><h3>实验 1　手写 Qwen3 前向</h3><div class="goal"><b>目标：</b>不用 transformers 的模型代码，自己从 safetensors 读权重、写出 Qwen3-0.6B 的完整前向，和 Hugging Face 的结果对齐；再加上 KV cache 和采样。对应第 1 课、问 4.3–4.8 和第 7.1 节。</div>
-<table><thead><tr><th>Qwen3-0.6B 配置</th><th>数值</th><th>写代码时要注意</th></tr></thead><tbody>
-<tr><td>hidden_size / 层数</td><td>1024 / 28</td><td></td></tr>
-<tr><td>Q head / KV head / head_dim</td><td>16 / 8 / 128</td><td>Q 投影是 1024 → 2048，比 hidden 大；每 2 个 Q head 共用 1 个 KV head</td></tr>
-<tr><td>MLP 中间维度</td><td>3072</td><td>SwiGLU：gate、up、down 三个矩阵</td></tr>
-<tr><td>词表</td><td>151,936</td><td>lm_head 与 embedding 共享权重（tie_word_embeddings）</td></tr>
-<tr><td>RoPE θ / RMSNorm ε</td><td>1,000,000 / 1e-6</td><td>Q、K 先做逐 head 的 RMSNorm（QK-Norm）再加 RoPE</td></tr>
-<tr><td>每 token 的 KV</td><td>112 KiB（BF16）</td><td>2 × 28 层 × 8 个 KV head × 128 × 2 字节</td></tr>
-</tbody></table>
-<p>一层的计算（伪代码）：</p>
-<pre class="f">x = embed_tokens[ids]                         # [T, 1024]
-for layer in range(28):
-    h = rmsnorm(x, input_layernorm)
-    q = h @ q_proj.T  -&gt; [T, 16, 128] -&gt; q_norm -&gt; RoPE
-    k = h @ k_proj.T  -&gt; [T,  8, 128] -&gt; k_norm -&gt; RoPE
-    v = h @ v_proj.T  -&gt; [T,  8, 128]
-    a = causal_attention(q, k, v)  # 每 2 个 Q head 共用 1 个 KV head
-    x = x + a.reshape(T, 2048) @ o_proj.T
-    h = rmsnorm(x, post_attention_layernorm)
-    x = x + (silu(h @ gate_proj.T) * (h @ up_proj.T)) @ down_proj.T
-logits = rmsnorm(x, norm) @ embed_tokens.T    # lm_head 与 embedding 共享</pre><h4>要做的事</h4><ol><li>读权重：用 safetensors 读出所有张量，打印名字和形状，对照下面的配置弄清每个张量的作用。</li><li>写前向：Embedding → 28 层（RMSNorm → attention → 残差 → RMSNorm → MLP → 残差）→ 最后的 RMSNorm → lm_head。attention 里包含 QK-Norm、RoPE、GQA 和因果 mask。</li><li>对齐：用 Hugging Face 的 <code>output_hidden_states=True</code> 逐层对比；BF16 下有小误差是正常的，可以先在 FP32 下对齐再切回 BF16。</li><li>生成循环：先写不带 cache 的版本（每一步重算全部 token），再写 KV cache 版本（预分配 [层, 2, 最大长度, KV head, head_dim]，prefill 写入，decode 每步追加 1 个）。</li><li>采样：greedy、temperature、top-k、top-p。</li></ol><h4>完成标准</h4><ul><li>同一个 prompt 贪心生成 64 个 token，输出和 Hugging Face 完全一致。</li><li>画出 TPOT 随上下文长度的变化：不带 cache 时持续上升，带 cache 时基本平稳。</li><li>KV cache 实际占用的显存和 112 KiB/token 的估算一致。</li></ul><h4>思考题</h4><ol><li>不带 cache 时，第 n 步大约要算多少？为什么 TPOT 随长度增长？</li><li>4K 上下文的一个请求，KV cache 有多大？16 GB 的卡除去权重，能同时放下多少个这样的请求？</li><li>你的 TPOT 离实验 0 的带宽上限还差多少？差在哪里？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://huggingface.co/Qwen/Qwen3-0.6B">Qwen3-0.6B 模型卡</a>：模型说明、思考模式开关、推荐的采样参数</li><li><a href="https://skyzh.github.io/tiny-llm/">tiny-llm</a>：基于 MLX 的“一周写一个推理服务”课程，可作为章节安排的参考</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab2"><h3>实验 2　引擎核心：调度、分页 KV、前缀缓存</h3><div class="goal"><b>目标：</b>把单请求的生成循环改造成能同时服务很多请求的引擎。对应第 2 课。</div><h4>要做的事</h4><ol><li>请求状态机：等待 → 运行 → 完成，以及被抢占后回到等待。</li><li>调度器：每一步给 prefill 和 decode 分配 token 预算，实现 continuous batching（第 2 课）。</li><li>Block manager：每块 16 个 token，空闲列表加引用计数；每个请求一张 block table。</li><li>分页 attention：先用 PyTorch 按 block table 把 KV 收集出来再算，正确性优先，性能留给实验 3。</li><li>前缀缓存：块哈希链 + 引用计数 + LRU 淘汰（第 2 课问 2.2）。</li><li>抢占：显存不够时回收某个请求的块，之后重算（第 2 课的“抢占”）。</li><li>chunked prefill：把长 prompt 切成多段，和 decode 混在同一步里。</li></ol><h4>完成标准</h4><ul><li>单请求输出和实验 1 完全一致。</li><li>100 个长度不一的请求，吞吐明显高于静态 batching。</li><li>多个请求共用一段 system prompt 时，后面请求的 TTFT 明显下降。</li></ul><h4>思考题</h4><ol><li>block 大小取 16 和取 128，各有什么利弊？</li><li>前缀缓存命中率很高时，显存里最占地方的是什么？该先淘汰谁？</li><li>混入一个很长的 prefill 时，decode 请求的 ITL 会怎样？chunked prefill 怎么缓解？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://github.com/GeeeekExplorer/nano-vllm">nano-vllm</a>：约 1,200 行 Python 的 vLLM 简化实现，调度器、block manager、前缀缓存都很短</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab3"><h3>实验 3　性能优化：kernel、量化、Graph、投机解码</h3><div class="goal"><b>目标：</b>把实验 2 的引擎跑快，并用实测数据验证第 3 课的结论。</div><h4>要做的事</h4><ol><li>用 Triton 写分页 decode attention：按 block table 读 KV，用 online softmax（问 3.1）一遍算完；再写融合的 RMSNorm + 残差、写入 KV cache 的 kernel。</li><li>INT8 权重量化：按输出通道存缩放系数，decode 时边读边反量化。7800 XT 没有 FP8 硬件，所以这里用 INT8。</li><li>HIP Graph：给几个固定的 batch 尺寸录制 decode 步，重放时省掉 kernel 启动开销（PyTorch 的 CUDA Graph 接口在 ROCm 上对应 HIP Graph）。</li><li>投机解码：Qwen3-0.6B 当草稿模型、Qwen3-4B 当目标模型（4B 的 BF16 权重约 8 GB，放得下）；统计接受率。</li><li>用 <code>torch.profiler</code> 找瓶颈，每做一项优化都记下前后数据。</li></ol><h4>完成标准</h4><ul><li>每个 kernel 的结果和 PyTorch 参考实现对齐。</li><li>decode TPOT 逐步下降，并能说清每一步省下的是什么（访存、计算还是启动开销）。</li><li>投机解码实测的每步产出 token 数，和公式 (1 − α<sup>k+1</sup>) / (1 − α) 对得上（第 3 课问 3.2）。</li></ul><h4>思考题</h4><ol><li>INT8 量化让 decode 变快了多少？为什么 prefill 几乎没变快？</li><li>HIP Graph 对小 batch 和大 batch 的收益为什么不同？</li><li>草稿模型猜 k = 2、4、8 个时，实测加速比怎么变？最优的 k 是多少？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file">FlashAttention</a>：README 里有 ROCm 支持说明：Triton 后端支持 RDNA，分页 attention 仍在开发</li><li><a href="https://github.com/pzsacc/nano-vllm-lite/blob/main/README.en.md">nano-vllm-lite</a>：在 nano-vllm 基础上加了 CUDA Graph、chunked prefill、FP8 KV cache，每项优化都有实测数据</li><li><a href="https://github.com/GeeeekExplorer/nano-vllm">nano-vllm</a>：约 1,200 行 Python 的 vLLM 简化实现，调度器、block manager、前缀缓存都很短</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab4"><h3>实验 4　并行：TP、MoE 与 EP</h3><div class="goal"><b>目标：</b>在单卡上把第 4 课的切分数学跑通；有条件的话，租 2 张 NVIDIA 卡跑真正的 TP。</div><h4>要做的事</h4><ol><li>TP：把 MLP 按“W_up 按列、W_down 按行”切成 2 份，分别计算再相加，验证和不切完全一致；attention 按 head 切同理（问 4.7）。</li><li>用 <code>torch.distributed</code> 的 gloo 后端开 2 个进程，在 CPU 上走一遍 all-reduce 的流程。</li><li>MoE：写一个 top-2 路由 + 8 个小专家的玩具层，再模拟 EP：按专家所在的“卡”分组 token（dispatch），算完再按原位置放回（combine），验证和逐个循环的结果一致（问 4.9）。</li><li>可选：租 2 张 NVIDIA GPU，把实验 3 的引擎改成 TP=2，测通信时间占比（对照第 4 课思考题 1c）。</li></ol><h4>完成标准</h4><ul><li>切分前后的输出一致（误差在数值精度范围内）。</li><li>能说清每层做几次 all-reduce、每次传多少数据。</li></ul><h4>思考题</h4><ol><li>TP=2 时，每个 decode 步的通信量和 batch 大小有什么关系？</li><li>MoE 的 token 分布不均时，EP 的哪一步最先成为瓶颈？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://github.com/sgl-project/mini-sglang">mini-sglang</a>：约 5,000 行的 SGLang 简化实现（radix cache、overlap scheduling、TP），只支持 Linux + NVIDIA</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab5"><h3>实验 5　服务与集群</h3><div class="goal"><b>目标：</b>把引擎包装成服务，并在一台机器上模拟第 5 课的集群机制。</div><h4>要做的事</h4><ol><li>OpenAI 兼容的流式接口（/v1/chat/completions），引擎在后台循环，请求用队列交给它。</li><li>两个引擎实例（同一张卡上两个进程，各用 Qwen3-0.6B）+ 一个路由器：比较随机、最短队列、“缓存命中 + 负载”代价函数三种策略（对照第 5 课的路由模拟）。</li><li>KV 卸载：把不活跃会话的 KV 搬到 CPU 的 pinned memory，回来时测“加载”和“重算”各要多久，找出拐点（对照第 5 课思考题 2）。</li><li>模拟 P/D 分离：一个进程只做 prefill，算完把 KV 通过 CPU 共享内存交给另一个只做 decode 的进程，测传输时间。</li></ol><h4>完成标准</h4><ul><li>三种路由策略的命中率和排队对比表。</li><li>加载与重算的实测拐点，和用带宽、算力估算的结果对比。</li></ul><h4>思考题</h4><ol><li>同一张卡上开两个实例，和一个实例用两倍显存相比，各有什么利弊？</li><li>你的 P/D 模拟里，传 KV 的时间占 TTFT 的多少？按层流水传输能省多少？</li></ol><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab6"><h3>实验 6　生产化：压测、SLO、限流</h3><div class="goal"><b>目标：</b>用第 6 课的方法评估自己的服务。</div><h4>要做的事</h4><ol><li>压测器：按泊松分布发请求，prompt 和输出长度可配置。</li><li>统计 TTFT、ITL、E2E 的 P50 / P90 / P99，以及 goodput（在 SLO 内完成的请求）。</li><li>排队上限 + 超载时返回 429；按租户的 token 配额（简单的公平调度）。</li><li>用 prometheus_client 暴露指标：排队数、运行数、KV 占用、TTFT 和 ITL 直方图。</li><li>可选：用同一个压测器测 vLLM 0.29.0（ROCm 10.1.0 兼容性矩阵里的版本，装在单独的 venv 里），作为对照基线。</li></ol><h4>完成标准</h4><ul><li>一张“请求速率 vs P99 TTFT / goodput”的曲线，找出满足 SLO 的最大请求速率。</li><li>打开限流后，超载时的尾延迟保持在可控范围内。</li></ul><h4>思考题</h4><ol><li>goodput 开始下降的拐点，和 KV 容量、算力哪个先到上限有关？</li><li>按 GPU 利用率扩缩容为什么不靠谱？用你自己的指标说明（第 6 课）。</li></ol><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab7"><h3>实验 7　选做：混合架构的状态管理</h3><div class="goal"><b>目标：</b>体验第 7 节讲的“KV + 状态”：线性 attention 层的固定大小状态，以及按检查点做前缀缓存。</div><h4>要做的事</h4><ol><li>写一个简化的线性 attention 层（递归形式：每来一个 token 更新一次固定大小的状态），可以用随机权重的玩具模型。</li><li>状态管理：每个请求一个固定槽位，和实验 2 的分页 KV 并存。</li><li>检查点式前缀缓存：每 N 个 token 保存一次状态快照，命中时从最近的检查点继续。</li></ol><h4>完成标准</h4><ul><li>相同前缀的请求能从检查点继续，省掉对应的 prefill。</li><li>画出检查点间隔 N 对命中率和显存占用的影响。</li></ul><h4>思考题</h4><ol><li>为什么状态不能像 KV 一样“截掉后面的就退回到更短前缀”？</li><li>检查点间隔取多大合适？和第 7.3 节 Qwen3-Next 的估算（一个检查点约等于 1,600 个 token 的 KV）对照。</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://docs.vllm.ai/en/latest/design/hybrid_kv_cache_manager/">vLLM：Hybrid KV Cache Manager</a>：按层类型分配缓存、按层定前缀命中规则</li><li><a href="https://arxiv.org/abs/2411.19379">Marconi（MLSys 2025）</a>：混合模型的前缀缓存：检查点存在哪里、留哪些</li><li><a href="https://pytorch.org/blog/hybrid-models-meet-sglang-more-than-full-attention/">Hybrid Models Meet SGLang</a>：SGLang 支持 Mamba / 线性 attention 混合模型的做法</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section></section><section id="faq"><h2>常见问题</h2><ul>
+</section><section class="lab" id="lab1"><h3>实验 1　手写 Qwen3 前向</h3><div class="goal"><b>目标：</b>不用 transformers 的模型代码，自己从 safetensors 读权重、写出 Qwen3-0.6B 的完整前向，和 Hugging Face 的结果对齐；再加上 KV cache 和采样。对应第 1 课、问 4.3–4.8 和第 7.1 节。</div><p class="tip"><b>怎么做：</b>按下面的第 0–8 步走，每步都有检查点，通过了再往下。代码分三个文件：<code>qwen3.py</code>（模型和生成）、<code>check.py</code>（和 Hugging Face 对齐）、<code>bench.py</code>（测速）。每步都给了函数签名、形状和要点；attention 和采样的参考实现折叠起来了，先自己写，卡住了再展开。所有代码基于 2026 年 10 月的 transformers 源码核对过，但没有在真机上跑过，遇到报错把输出贴过来。</p><table><thead><tr><th>Qwen3-0.6B 配置</th><th>数值</th><th>写代码时要注意</th></tr></thead><tbody><tr><td>hidden_size / 层数</td><td>1024 / 28</td><td></td></tr><tr><td>Q head / KV head / head_dim</td><td>16 / 8 / 128</td><td>Q 投影是 1024 → 2048，比 hidden 大；每 2 个 Q head 共用 1 个 KV head</td></tr><tr><td>MLP 中间维度</td><td>3072</td><td>SwiGLU：gate、up、down 三个矩阵</td></tr><tr><td>词表</td><td>151,936</td><td>lm_head 与 embedding 共享权重（tie_word_embeddings）</td></tr><tr><td>RoPE θ / RMSNorm ε</td><td>1,000,000 / 1e-6</td><td>Q、K 先做逐 head 的 RMSNorm（QK-Norm）再加 RoPE</td></tr><tr><td>每 token 的 KV</td><td>112 KiB（BF16）</td><td>2 × 28 层 × 8 个 KV head × 128 × 2 字节</td></tr></tbody></table><h4>第 0 步：看清权重</h4><p>先把配置和权重名打出来，对照下表弄清每个张量的作用。</p><pre class="f">import glob, json, os
+from huggingface_hub import snapshot_download
+from safetensors import safe_open
+
+# 实验 0 已经下载过，这里直接返回本地缓存的路径
+path = snapshot_download(&quot;Qwen/Qwen3-0.6B&quot;)
+cfg = json.load(open(os.path.join(path, &quot;config.json&quot;)))
+keys = [&quot;hidden_size&quot;, &quot;num_hidden_layers&quot;, &quot;num_attention_heads&quot;,
+        &quot;num_key_value_heads&quot;, &quot;head_dim&quot;, &quot;intermediate_size&quot;,
+        &quot;rope_theta&quot;, &quot;rms_norm_eps&quot;, &quot;tie_word_embeddings&quot;]
+print({k: cfg.get(k) for k in keys})
+
+for fn in glob.glob(os.path.join(path, &quot;*.safetensors&quot;)):
+    with safe_open(fn, framework=&quot;pt&quot;) as f:
+        for name in sorted(f.keys()):
+            if &quot;.layers.&quot; in name and &quot;.layers.0.&quot; not in name:
+                continue          # 其余各层和第 0 层结构相同
+            t = f.get_tensor(name)
+            print(f&quot;{name:48s} {tuple(t.shape)} {t.dtype}&quot;)</pre><table><thead><tr><th>张量（第 i 层的前缀是 model.layers.i.）</th><th>形状</th><th>作用</th></tr></thead><tbody><tr><td><code>model.embed_tokens.weight</code></td><td>[151936, 1024]</td><td>按 token id 取行；也当 lm_head 用</td></tr><tr><td><code>input_layernorm.weight</code></td><td>[1024]</td><td>attention 前的 RMSNorm</td></tr><tr><td><code>self_attn.q_proj.weight</code></td><td>[2048, 1024]</td><td>算出 16 个 Q head × 128</td></tr><tr><td><code>self_attn.k_proj.weight</code>、<code>v_proj.weight</code></td><td>[1024, 1024]</td><td>各算出 8 个 KV head × 128</td></tr><tr><td><code>self_attn.q_norm.weight</code>、<code>k_norm.weight</code></td><td>[128]</td><td>QK-Norm：每个 head 内部的 RMSNorm</td></tr><tr><td><code>self_attn.o_proj.weight</code></td><td>[1024, 2048]</td><td>attention 输出投影回 1024</td></tr><tr><td><code>post_attention_layernorm.weight</code></td><td>[1024]</td><td>MLP 前的 RMSNorm</td></tr><tr><td><code>mlp.gate_proj.weight</code>、<code>up_proj.weight</code></td><td>[3072, 1024]</td><td>SwiGLU 的两路</td></tr><tr><td><code>mlp.down_proj.weight</code></td><td>[1024, 3072]</td><td>投影回 1024</td></tr><tr><td><code>model.norm.weight</code></td><td>[1024]</td><td>最后一层之后的 RMSNorm</td></tr><tr><td><code>lm_head.weight</code>（可能没有）</td><td>[151936, 1024]</td><td>和 embedding 共享，直接用 embed_tokens.weight</td></tr></tbody></table><p class="tip"><code>nn.Linear</code> 的权重形状是 [输出, 输入]，计算是 x 乘以 W 的转置。直接写 <code>F.linear(x, W)</code> 最省事，也和 HF 用的是同一个算子。</p><h4>第 1 步：加载权重（qwen3.py）</h4><p>把权重按层整理成字典，后面的函数都从这里取。lm_head 不用单独加载：配置里 <code>tie_word_embeddings</code> 为 true，直接用 embedding。</p><pre class="f">import glob, os
+import torch
+import torch.nn.functional as F
+from safetensors import safe_open
+
+torch.set_grad_enabled(False)        # 只做推理，全程不需要梯度
+
+NAMES = dict(
+    ln1=&quot;input_layernorm&quot;, ln2=&quot;post_attention_layernorm&quot;,
+    wq=&quot;self_attn.q_proj&quot;, wk=&quot;self_attn.k_proj&quot;,
+    wv=&quot;self_attn.v_proj&quot;, wo=&quot;self_attn.o_proj&quot;,
+    qn=&quot;self_attn.q_norm&quot;, kn=&quot;self_attn.k_norm&quot;,
+    gate=&quot;mlp.gate_proj&quot;, up=&quot;mlp.up_proj&quot;, down=&quot;mlp.down_proj&quot;)
+
+def load_weights(path, dtype=torch.bfloat16, device=&quot;cuda&quot;):
+    raw = {}
+    for fn in glob.glob(os.path.join(path, &quot;*.safetensors&quot;)):
+        with safe_open(fn, framework=&quot;pt&quot;) as f:
+            for k in f.keys():
+                if k != &quot;lm_head.weight&quot;:   # 和 embedding 共享，不另存
+                    raw[k] = f.get_tensor(k).to(device, dtype)
+    layers = [{k: raw[f&quot;model.layers.{i}.{v}.weight&quot;]
+               for k, v in NAMES.items()} for i in range(28)]
+    return dict(embed=raw[&quot;model.embed_tokens.weight&quot;],
+                norm=raw[&quot;model.norm.weight&quot;], layers=layers)</pre><h4>第 2 步：先搭好对照组（check.py）</h4><p>先准备好“标准答案”再写模型，每写完一个组件就能马上知道对不对。做法是加载 HF 模型，在关键模块上挂 forward hook，记下每个模块的输入和输出；之后把 HF 的输入喂给你的函数，比较输出。这样每个组件单独检查，误差不会层层累积，第一个对不上的地方就是 bug 所在。</p><pre class="f">import torch
+from huggingface_hub import snapshot_download
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from qwen3 import *          # 写到哪一步，就能检查到哪一步
+
+dt = torch.float32           # 先用 FP32 对齐，全部通过后改成 bfloat16
+path = snapshot_download(&quot;Qwen/Qwen3-0.6B&quot;)
+tok = AutoTokenizer.from_pretrained(path)
+ref = AutoModelForCausalLM.from_pretrained(
+    path, dtype=dt, attn_implementation=&quot;eager&quot;).to(&quot;cuda&quot;).eval()
+W = load_weights(path, dtype=dt)
+
+acts = {}                    # 名字 → (输入, 输出)，都去掉了 batch 维
+def save(name):
+    def hook(mod, args, kwargs, out):
+        x = args[0] if args else kwargs[&quot;hidden_states&quot;]
+        y = out[0] if isinstance(out, tuple) else out
+        acts[name] = (x[0], y[0])
+    return hook
+
+m = ref.model
+for i, lyr in enumerate(m.layers):
+    lyr.register_forward_hook(save(f&quot;layer{i}&quot;), with_kwargs=True)
+l0 = m.layers[0]
+for name, mod in [(&quot;ln1&quot;, l0.input_layernorm), (&quot;mlp&quot;, l0.mlp),
+                  (&quot;qnorm&quot;, l0.self_attn.q_norm),
+                  (&quot;attn&quot;, l0.self_attn)]:
+    mod.register_forward_hook(save(name), with_kwargs=True)
+
+# 随便找一篇几百词的英文文章，存成 sample.txt
+text = open(&quot;sample.txt&quot;).read()
+ids = tok(text, return_tensors=&quot;pt&quot;).input_ids[0, :512].cuda()
+ref_logits = ref(ids[None]).logits[0].float()
+
+def rel(a, b):               # 相对误差：最大绝对差 ÷ 参照的最大绝对值
+    a, b = a.float(), b.float()
+    return ((a - b).abs().max() / b.abs().max()).item()
+
+L0 = W[&quot;layers&quot;][0]
+pos = torch.arange(len(ids), device=&quot;cuda&quot;)</pre><ul><li>HF 的 attention 要用 eager 实现：它的运算顺序和手写的一样。默认的 SDPA 走另一条计算路径（实验 0 里看到它退回了 FP32 的 math 实现），会多出一些误差。</li><li>先用 FP32 对齐，全部通过后再把 <code>dt</code> 改成 <code>torch.bfloat16</code>。</li><li>误差的经验值：FP32 下单个组件应在 1e-5 以下，逐层累积到最后一层也应在 1e-4 以下，出现 1e-3 以上基本就是写错了；BF16 下 1e-2 左右都正常。</li></ul><h4>第 3 步：RMSNorm、RoPE、MLP（qwen3.py）</h4><p>这三个函数短，但每个都有一处容易写错的细节，注释里标出来了。可以先自己写，写完再对照：</p><pre class="f">def rms_norm(x, w, eps=1e-6):
+    # 和 HF 一样：在 FP32 里归一化，转回原 dtype 之后再乘权重
+    xf = x.float()
+    xf = xf * torch.rsqrt(xf.pow(2).mean(-1, keepdim=True) + eps)
+    return w * xf.to(x.dtype)
+
+def rope_cos_sin(pos, dtype, head_dim=128, theta=1e6):
+    # pos: [T] 的绝对位置；返回 [T, 128] 的 cos、sin
+    inv = 1.0 / theta ** (torch.arange(0, head_dim, 2).float() / head_dim)
+    f = pos.float()[:, None] * inv.to(pos.device)[None, :]   # [T, 64]
+    emb = torch.cat([f, f], dim=-1)                           # [T, 128]
+    return emb.cos().to(dtype), emb.sin().to(dtype)
+
+def rotate_half(x):
+    x1, x2 = x.chunk(2, dim=-1)      # 前一半和后一半配对，不是奇偶交错
+    return torch.cat([-x2, x1], dim=-1)
+
+def apply_rope(x, cos, sin):
+    # x: [T, heads, 128]；cos、sin: [T, 128]，对每个 head 广播
+    return x * cos[:, None, :] + rotate_half(x) * sin[:, None, :]
+
+def mlp(x, L):
+    g = F.silu(F.linear(x, L[&quot;gate&quot;]))
+    return F.linear(g * F.linear(x, L[&quot;up&quot;]), L[&quot;down&quot;])</pre><p>检查点（接在 check.py 后面）：</p><pre class="f">cos, sin = rope_cos_sin(pos, dt)
+x, y = acts[&quot;ln1&quot;];   print(&quot;rms_norm &quot;, rel(rms_norm(x, L0[&quot;ln1&quot;]), y))
+x, y = acts[&quot;qnorm&quot;]; print(&quot;q_norm   &quot;, rel(rms_norm(x, L0[&quot;qn&quot;]), y))
+x, y = acts[&quot;mlp&quot;];   print(&quot;mlp      &quot;, rel(mlp(x, L0), y))
+c, s = m.rotary_emb(torch.zeros(1, dtype=dt, device=&quot;cuda&quot;), pos[None])
+print(&quot;rope     &quot;, rel(cos, c[0]), rel(sin, s[0]))</pre><h4>第 4 步：attention（qwen3.py）</h4><p>这是本实验最容易出错的地方。先只支持 batch=1，输入是 [T, 1024]；cache 的参数现在先不传，第 6 步再用。按下面 9 个注释一步步写：</p><pre class="f">def attention(x, L, cos, sin, kc=None, vc=None, start=0):
+    &quot;&quot;&quot;x: [T, 1024]，已经过 input_layernorm；L: 这一层的权重
+    kc、vc: 这一层的 KV cache，形状 [max_len, 8, 128]（第 6 步才用）
+    start: 这 T 个 token 里第一个的绝对位置&quot;&quot;&quot;
+    T = x.shape[0]
+    # 1. q、k、v = F.linear(x, wq / wk / wv)，再分别 view 成
+    #    [T, 16, 128]、[T, 8, 128]、[T, 8, 128]
+    # 2. QK-Norm：q、k 各做一次 rms_norm（权重 qn、kn，作用在 128 维）
+    # 3. q、k 加 RoPE（apply_rope）；v 既不 norm 也不加 RoPE
+    # 4. 有 cache 时：把 k、v 写进 kc、vc 的 [start, start+T)，
+    #    再把 [0, start+T) 整段取出来当作 k、v（共 S 个位置）
+    # 5. GQA：k、v 各 repeat_interleave(2, dim=1)，变成 16 个 head
+    # 6. head 维换到最前：q 为 [16, T, 128]，k、v 为 [16, S, 128]；
+    #    scores = (q @ k.transpose(1, 2)) * 128 ** -0.5，得 [16, T, S]
+    # 7. 因果 mask：第 i 个 query 的绝对位置是 start+i，
+    #    只能看位置不超过它的 key，其余填 -inf
+    # 8. softmax 用 FP32 算，再转回 q 的 dtype；out = probs @ v
+    # 9. out 换回 [T, 16, 128]，reshape 成 [T, 2048]，再过 wo
+    raise NotImplementedError</pre><details><summary>参考实现（先自己写，卡住了再看）</summary><pre class="f">def attention(x, L, cos, sin, kc=None, vc=None, start=0):
+    T = x.shape[0]
+    q = F.linear(x, L[&quot;wq&quot;]).view(T, 16, 128)
+    k = F.linear(x, L[&quot;wk&quot;]).view(T, 8, 128)
+    v = F.linear(x, L[&quot;wv&quot;]).view(T, 8, 128)
+    q = apply_rope(rms_norm(q, L[&quot;qn&quot;]), cos, sin)   # 先 norm 再 RoPE
+    k = apply_rope(rms_norm(k, L[&quot;kn&quot;]), cos, sin)
+    if kc is not None:
+        kc[start:start + T] = k        # cache 里存 norm、RoPE 之后的 K
+        vc[start:start + T] = v
+        k, v = kc[:start + T], vc[:start + T]
+    S = k.shape[0]
+    k = k.repeat_interleave(2, dim=1)  # KV head j 给 Q head 2j、2j+1 用
+    v = v.repeat_interleave(2, dim=1)
+    q, k, v = (t.transpose(0, 1) for t in (q, k, v))
+    scores = (q @ k.transpose(1, 2)) * 128 ** -0.5   # [16, T, S]
+    qpos = start + torch.arange(T, device=x.device)
+    kpos = torch.arange(S, device=x.device)
+    scores = scores.masked_fill(kpos[None, :] &gt; qpos[:, None],
+                                float(&quot;-inf&quot;))
+    probs = F.softmax(scores, dim=-1, dtype=torch.float32).to(q.dtype)
+    out = (probs @ v).transpose(0, 1).reshape(T, 16 * 128)
+    return F.linear(out, L[&quot;wo&quot;])</pre></details><p>检查点：</p><pre class="f">x, y = acts[&quot;attn&quot;]
+print(&quot;attention&quot;, rel(attention(x, L0, cos, sin), y))
+x, y = acts[&quot;layer0&quot;]
+print(&quot;layer0   &quot;, rel(layer(x, L0, cos, sin), y))</pre><p class="tip">attention 对不上、但第 3 步都通过时，按这个顺序排查：q、k、v 的 view 形状 → norm 在 RoPE 之前 → rotate_half 的配对方式 → repeat_interleave → 缩放用 128 → mask 的方向 → 最后的 transpose 和 reshape。</p><h4>第 5 步：拼成完整前向，逐层对齐（qwen3.py）</h4><pre class="f">def layer(x, L, cos, sin, kc=None, vc=None, start=0):
+    h = x + attention(rms_norm(x, L[&quot;ln1&quot;]), L, cos, sin, kc, vc, start)
+    return h + mlp(rms_norm(h, L[&quot;ln2&quot;]), L)
+
+def forward(ids, W, cache=None, start=0, last_only=False):
+    &quot;&quot;&quot;ids: [T] 的 token id；cache: (k_cache, v_cache) 或 None&quot;&quot;&quot;
+    x = W[&quot;embed&quot;][ids]                                    # [T, 1024]
+    pos = torch.arange(start, start + len(ids), device=ids.device)
+    cos, sin = rope_cos_sin(pos, x.dtype)
+    for i, L in enumerate(W[&quot;layers&quot;]):
+        kc = vc = None
+        if cache is not None:
+            kc, vc = cache[0][i], cache[1][i]
+        x = layer(x, L, cos, sin, kc, vc, start)
+    if last_only:
+        x = x[-1:]            # 生成时只需要最后一个位置的 logits
+    return F.linear(rms_norm(x, W[&quot;norm&quot;]), W[&quot;embed&quot;])   # lm_head</pre><p>检查点：每层的输出、最后的 logits，以及 teacher forcing 下的 top-1 一致率。teacher forcing 指每个位置都用同一段真实文本作输入，比较两边预测的下一个 token，这样一处分歧不会影响后面的位置：</p><pre class="f">x = W[&quot;embed&quot;][ids]
+for i, L in enumerate(W[&quot;layers&quot;]):
+    x = layer(x, L, cos, sin)
+    print(f&quot;layer{i:2d}  {rel(x, acts[f&#x27;layer{i}&#x27;][1]):.1e}&quot;)
+logits = forward(ids, W).float()
+print(f&quot;logits   {rel(logits, ref_logits):.1e}&quot;)
+same = (logits.argmax(-1) == ref_logits.argmax(-1)).float().mean()
+print(f&quot;top-1 一致率 {same.item():.2%}&quot;)</pre><p>FP32 下 top-1 一致率应为 100%。换成 BF16 后 99% 以上就算通过：个别位置两个候选的概率几乎相等，舍入误差就能让它们换位。误差随层数缓慢增大是正常的；如果从第 0 层起就很大，回到第 3、4 步的检查点去查。</p><h4>第 6 步：生成循环和 KV cache（qwen3.py）</h4><p>先写不带 cache 的版本：每生成一个 token 都把全部 token 重算一遍，简单但慢，正好当正确性的参照。再写带 cache 的版本：cache 只存 8 个 KV head，K 存的是 norm 和 RoPE 之后的结果；prefill 一次写入整个 prompt，之后每步只算 1 个新 token，它的位置就是当前长度。attention 里第 4 个注释就是为这一步准备的。</p><pre class="f">def generate_nocache(ids, W, n_new):
+    for _ in range(n_new):
+        logits = forward(ids, W, last_only=True)   # 每步重算全部 token
+        ids = torch.cat([ids, logits[-1].argmax()[None]])
+    return ids[-n_new:]
+
+def new_cache(max_len, dtype, device=&quot;cuda&quot;):
+    shape = (28, max_len, 8, 128)      # [层, 位置, KV head, head_dim]
+    return (torch.zeros(shape, dtype=dtype, device=device),
+            torch.zeros(shape, dtype=dtype, device=device))
+
+def generate(ids, W, n_new, max_len=4096, pick=None):
+    pick = pick or (lambda lg: lg.argmax())          # 默认贪心
+    cache = new_cache(max_len, W[&quot;embed&quot;].dtype)
+    logits = forward(ids, W, cache, 0, last_only=True)      # prefill
+    out = []
+    for step in range(n_new):
+        nxt = pick(logits[-1])
+        out.append(nxt)
+        if step &lt; n_new - 1:
+            p = len(ids) + step          # 新 token 的绝对位置
+            logits = forward(nxt[None], W, cache, p, last_only=True)
+    return torch.stack(out)</pre><p>检查点（check.py）：</p><pre class="f">p = tok(&quot;The history of the transistor begins&quot;,
+        return_tensors=&quot;pt&quot;).input_ids[0].cuda()
+mine = generate(p, W, 64)
+nocache = generate_nocache(p, W, 64)
+hf = ref.generate(p[None], attention_mask=torch.ones_like(p[None]),
+                  max_new_tokens=64, min_new_tokens=64,
+                  do_sample=False)[0, len(p):]
+print(&quot;有 cache == 无 cache:&quot;, torch.equal(mine, nocache))
+print(&quot;有 cache == HF      :&quot;, torch.equal(mine, hf))
+print(tok.decode(mine))</pre><p>KV cache 最常见的错误：</p><ul><li>decode 时 RoPE 的位置用了 0 或相对位置：第一个新 token 来自 prefill，是对的，从第二个开始就不对了。</li><li>cache 里存的是 RoPE 之前的 K，或者对取出来的 K 又做了一次 RoPE。</li><li>cache 存了 repeat_interleave 之后的 16 个 head：结果对，但显存翻倍。</li><li>对 V 做了 norm 或 RoPE。</li><li>start 没有随长度增加，新 token 覆盖了旧位置。</li></ul><h4>第 7 步：采样（qwen3.py）</h4><p>按 HF 的顺序实现：先除以 temperature，再做 top-k，最后做 top-p；temperature 为 0 时就是贪心。Qwen3 模型卡推荐的参数：思考模式 temperature 0.6、top-p 0.95、top-k 20；非思考模式 0.7、0.8、20。</p><details><summary>参考实现</summary><pre class="f">def sample(logits, temperature=0.6, top_k=20, top_p=0.95):
+    # 顺序和 HF 一样：temperature → top-k → top-p
+    logits = logits.float() / temperature
+    vals, idx = logits.topk(top_k)            # 从大到小
+    probs = F.softmax(vals, dim=-1)
+    cum = probs.cumsum(-1)
+    probs[cum - probs &gt; top_p] = 0            # 前面已够 top_p 的都丢掉
+    probs = probs / probs.sum()
+    return idx[torch.multinomial(probs, 1)][0]
+
+# 用法：generate(ids, W, 64, pick=sample)</pre></details><p>检查点：随机数没法逐个比对，就看统计。下面这组 logits 按 temperature 1、top-k 5、top-p 0.9 截断后，应该只剩前 3 个 token，采样频率约为 0.665、0.245、0.090。手算：softmax 之后前两个累加到 0.87，还不到 0.9；加上第三个超过 0.9，就停在第三个。</p><pre class="f">logits = torch.tensor([3.0, 2.0, 1.0, 0.0, -1.0])
+cnt = torch.zeros(5)
+for _ in range(20000):
+    cnt[sample(logits, 1.0, 5, 0.9)] += 1
+print(cnt / cnt.sum())</pre><h4>第 8 步：测速和显存（bench.py）</h4><pre class="f">import time
+import torch
+from huggingface_hub import snapshot_download
+from qwen3 import load_weights, forward, new_cache
+
+W = load_weights(snapshot_download(&quot;Qwen/Qwen3-0.6B&quot;))
+
+def ms(fn, iters=10):
+    for _ in range(2):
+        fn()                                     # 预热
+    torch.cuda.synchronize()
+    t0 = time.perf_counter()
+    for _ in range(iters):
+        fn()
+    torch.cuda.synchronize()
+    return (time.perf_counter() - t0) / iters * 1e3
+
+print(&quot;  长度  无 cache(ms)  有 cache(ms)&quot;)
+for n in [128, 256, 512, 1024, 2048]:
+    ids = torch.randint(0, 151936, (n,), device=&quot;cuda&quot;)
+    t_full = ms(lambda: forward(ids, W, last_only=True))
+    cache = new_cache(n + 1, torch.bfloat16)
+    forward(ids, W, cache, 0, last_only=True)    # 先把 cache 填好
+    last = ids[-1:]
+    t_step = ms(lambda: forward(last, W, cache, n, last_only=True))
+    print(f&quot;{n:6d} {t_full:13.2f} {t_step:13.2f}&quot;)
+
+before = torch.cuda.memory_allocated()
+kv = new_cache(4096, torch.bfloat16)
+kib = (torch.cuda.memory_allocated() - before) / 4096 / 1024
+print(f&quot;KV cache: {kib:.0f} KiB/token&quot;)</pre><ul><li>无 cache 的耗时随长度明显上升：每一步都相当于把全部 token 重新 prefill 一遍。</li><li>有 cache 的基本平稳，只随 attention 要读的 KV 变多而略有上升。</li><li>有 cache 的 TPOT 应该和实验 0 的 HF 基线（16.35 ms）在同一量级，离 2.11 ms 的带宽下限还很远：每个 decode 步仍然要启动上千个小 kernel，这是实验 3 要解决的。</li><li>KV cache 应为 112 KiB/token，4096 个 token 一共 448 MiB。</li></ul><h4>常见坑（汇总）</h4><ol><li>权重形状是 [输出, 输入]：用 <code>F.linear(x, W)</code>，等于 x 乘以 W 的转置。</li><li>RMSNorm 在 FP32 里算，转回原 dtype 之后再乘权重。</li><li>QK-Norm 在 RoPE 之前、按 head 做（作用在最后的 128 维）；V 既不 norm 也不加 RoPE。</li><li>RoPE 是前后两半配对（rotate_half），不是相邻两个一组；θ 是 1,000,000；位置用绝对位置。</li><li>GQA 用 <code>repeat_interleave</code>（Q head 0、1 共用 KV head 0），不是 <code>repeat</code>。</li><li>attention 的缩放用 head_dim（128）的平方根，不是 hidden_size（1024）。</li><li>softmax 在 FP32 里算，再转回原 dtype。</li><li>lm_head 就是 embedding；生成时只算最后一个位置的 logits（lm_head 是最大的矩阵，有 311 MB）。</li><li>对齐时 HF 要用 eager attention；HF 的 <code>generate</code> 从 generation_config 继承了 <code>do_sample=True</code>，比较贪心输出时要显式传 <code>do_sample=False</code>。</li><li>如果用 <code>output_hidden_states=True</code> 对齐：一共 29 项，第 0 项是 embedding，第 i 项是第 i−1 层的输出，最后一项已经过了最后的 RMSNorm，不是第 27 层的原始输出。第 2 步的 hook 更直观。</li><li>全程关掉梯度（<code>torch.set_grad_enabled(False)</code>），否则会多存很多中间结果。</li></ol><h4>完成标准</h4><ul><li>FP32：第 3、4 步的各项检查在 1e-5 以下、第 5 步各层在 1e-4 以下（经验值），top-1 一致率 100%，贪心生成 64 个 token 和 HF 完全一致。</li><li>BF16：top-1 一致率 99% 以上；贪心生成前面一段和 HF 一致，后面在两个候选概率接近的位置分叉属正常。</li><li>有 cache 和无 cache 的贪心输出完全一致。</li><li>第 8 步的表能看出两条曲线的区别；KV cache 实测 112 KiB/token。</li></ul><h4>思考题</h4><ol><li>不带 cache 时，第 n 步大约要算多少？为什么 TPOT 随长度增长？</li><li>4K 上下文的一个请求，KV cache 有多大？16 GB 的卡除去权重，能同时放下多少个这样的请求？</li><li>你的 TPOT 离实验 0 的带宽上限还差多少？差在哪里？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://huggingface.co/Qwen/Qwen3-0.6B">Qwen3-0.6B 模型卡</a>：模型说明、思考模式开关、推荐的采样参数</li><li><a href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen3/modeling_qwen3.py">Hugging Face 的 Qwen3 实现（modeling_qwen3.py）</a>：对齐时的标准答案：RMSNorm、RoPE、QK-Norm、GQA 的确切写法</li><li><a href="https://skyzh.github.io/tiny-llm/">tiny-llm</a>：基于 MLX 的“一周写一个推理服务”课程，可作为章节安排的参考</li></ul></section><section class="lab" id="lab2"><h3>实验 2　引擎核心：调度、分页 KV、前缀缓存</h3><div class="goal"><b>目标：</b>把单请求的生成循环改造成能同时服务很多请求的引擎。对应第 2 课。</div><h4>要做的事</h4><ol><li>请求状态机：等待 → 运行 → 完成，以及被抢占后回到等待。</li><li>调度器：每一步给 prefill 和 decode 分配 token 预算，实现 continuous batching（第 2 课）。</li><li>Block manager：每块 16 个 token，空闲列表加引用计数；每个请求一张 block table。</li><li>分页 attention：先用 PyTorch 按 block table 把 KV 收集出来再算，正确性优先，性能留给实验 3。</li><li>前缀缓存：块哈希链 + 引用计数 + LRU 淘汰（第 2 课问 2.2）。</li><li>抢占：显存不够时回收某个请求的块，之后重算（第 2 课的“抢占”）。</li><li>chunked prefill：把长 prompt 切成多段，和 decode 混在同一步里。</li></ol><h4>完成标准</h4><ul><li>单请求输出和实验 1 完全一致。</li><li>100 个长度不一的请求，吞吐明显高于静态 batching。</li><li>多个请求共用一段 system prompt 时，后面请求的 TTFT 明显下降。</li></ul><h4>思考题</h4><ol><li>block 大小取 16 和取 128，各有什么利弊？</li><li>前缀缓存命中率很高时，显存里最占地方的是什么？该先淘汰谁？</li><li>混入一个很长的 prefill 时，decode 请求的 ITL 会怎样？chunked prefill 怎么缓解？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://github.com/GeeeekExplorer/nano-vllm">nano-vllm</a>：约 1,200 行 Python 的 vLLM 简化实现，调度器、block manager、前缀缓存都很短</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab3"><h3>实验 3　性能优化：kernel、量化、Graph、投机解码</h3><div class="goal"><b>目标：</b>把实验 2 的引擎跑快，并用实测数据验证第 3 课的结论。</div><h4>要做的事</h4><ol><li>用 Triton 写分页 decode attention：按 block table 读 KV，用 online softmax（问 3.1）一遍算完；再写融合的 RMSNorm + 残差、写入 KV cache 的 kernel。</li><li>INT8 权重量化：按输出通道存缩放系数，decode 时边读边反量化。7800 XT 没有 FP8 硬件，所以这里用 INT8。</li><li>HIP Graph：给几个固定的 batch 尺寸录制 decode 步，重放时省掉 kernel 启动开销（PyTorch 的 CUDA Graph 接口在 ROCm 上对应 HIP Graph）。</li><li>投机解码：Qwen3-0.6B 当草稿模型、Qwen3-4B 当目标模型（4B 的 BF16 权重约 8 GB，放得下）；统计接受率。</li><li>用 <code>torch.profiler</code> 找瓶颈，每做一项优化都记下前后数据。</li></ol><h4>完成标准</h4><ul><li>每个 kernel 的结果和 PyTorch 参考实现对齐。</li><li>decode TPOT 逐步下降，并能说清每一步省下的是什么（访存、计算还是启动开销）。</li><li>投机解码实测的每步产出 token 数，和公式 (1 − α<sup>k+1</sup>) / (1 − α) 对得上（第 3 课问 3.2）。</li></ul><h4>思考题</h4><ol><li>INT8 量化让 decode 变快了多少？为什么 prefill 几乎没变快？</li><li>HIP Graph 对小 batch 和大 batch 的收益为什么不同？</li><li>草稿模型猜 k = 2、4、8 个时，实测加速比怎么变？最优的 k 是多少？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file">FlashAttention</a>：README 里有 ROCm 支持说明：Triton 后端支持 RDNA，分页 attention 仍在开发</li><li><a href="https://github.com/pzsacc/nano-vllm-lite/blob/main/README.en.md">nano-vllm-lite</a>：在 nano-vllm 基础上加了 CUDA Graph、chunked prefill、FP8 KV cache，每项优化都有实测数据</li><li><a href="https://github.com/GeeeekExplorer/nano-vllm">nano-vllm</a>：约 1,200 行 Python 的 vLLM 简化实现，调度器、block manager、前缀缓存都很短</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab4"><h3>实验 4　并行：TP、MoE 与 EP</h3><div class="goal"><b>目标：</b>在单卡上把第 4 课的切分数学跑通；有条件的话，租 2 张 NVIDIA 卡跑真正的 TP。</div><h4>要做的事</h4><ol><li>TP：把 MLP 按“W_up 按列、W_down 按行”切成 2 份，分别计算再相加，验证和不切完全一致；attention 按 head 切同理（问 4.7）。</li><li>用 <code>torch.distributed</code> 的 gloo 后端开 2 个进程，在 CPU 上走一遍 all-reduce 的流程。</li><li>MoE：写一个 top-2 路由 + 8 个小专家的玩具层，再模拟 EP：按专家所在的“卡”分组 token（dispatch），算完再按原位置放回（combine），验证和逐个循环的结果一致（问 4.9）。</li><li>可选：租 2 张 NVIDIA GPU，把实验 3 的引擎改成 TP=2，测通信时间占比（对照第 4 课思考题 1c）。</li></ol><h4>完成标准</h4><ul><li>切分前后的输出一致（误差在数值精度范围内）。</li><li>能说清每层做几次 all-reduce、每次传多少数据。</li></ul><h4>思考题</h4><ol><li>TP=2 时，每个 decode 步的通信量和 batch 大小有什么关系？</li><li>MoE 的 token 分布不均时，EP 的哪一步最先成为瓶颈？</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://github.com/sgl-project/mini-sglang">mini-sglang</a>：约 5,000 行的 SGLang 简化实现（radix cache、overlap scheduling、TP），只支持 Linux + NVIDIA</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab5"><h3>实验 5　服务与集群</h3><div class="goal"><b>目标：</b>把引擎包装成服务，并在一台机器上模拟第 5 课的集群机制。</div><h4>要做的事</h4><ol><li>OpenAI 兼容的流式接口（/v1/chat/completions），引擎在后台循环，请求用队列交给它。</li><li>两个引擎实例（同一张卡上两个进程，各用 Qwen3-0.6B）+ 一个路由器：比较随机、最短队列、“缓存命中 + 负载”代价函数三种策略（对照第 5 课的路由模拟）。</li><li>KV 卸载：把不活跃会话的 KV 搬到 CPU 的 pinned memory，回来时测“加载”和“重算”各要多久，找出拐点（对照第 5 课思考题 2）。</li><li>模拟 P/D 分离：一个进程只做 prefill，算完把 KV 通过 CPU 共享内存交给另一个只做 decode 的进程，测传输时间。</li></ol><h4>完成标准</h4><ul><li>三种路由策略的命中率和排队对比表。</li><li>加载与重算的实测拐点，和用带宽、算力估算的结果对比。</li></ul><h4>思考题</h4><ol><li>同一张卡上开两个实例，和一个实例用两倍显存相比，各有什么利弊？</li><li>你的 P/D 模拟里，传 KV 的时间占 TTFT 的多少？按层流水传输能省多少？</li></ol><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab6"><h3>实验 6　生产化：压测、SLO、限流</h3><div class="goal"><b>目标：</b>用第 6 课的方法评估自己的服务。</div><h4>要做的事</h4><ol><li>压测器：按泊松分布发请求，prompt 和输出长度可配置。</li><li>统计 TTFT、ITL、E2E 的 P50 / P90 / P99，以及 goodput（在 SLO 内完成的请求）。</li><li>排队上限 + 超载时返回 429；按租户的 token 配额（简单的公平调度）。</li><li>用 prometheus_client 暴露指标：排队数、运行数、KV 占用、TTFT 和 ITL 直方图。</li><li>可选：用同一个压测器测 vLLM 0.29.0（ROCm 10.1.0 兼容性矩阵里的版本，装在单独的 venv 里），作为对照基线。</li></ol><h4>完成标准</h4><ul><li>一张“请求速率 vs P99 TTFT / goodput”的曲线，找出满足 SLO 的最大请求速率。</li><li>打开限流后，超载时的尾延迟保持在可控范围内。</li></ul><h4>思考题</h4><ol><li>goodput 开始下降的拐点，和 KV 容量、算力哪个先到上限有关？</li><li>按 GPU 利用率扩缩容为什么不靠谱？用你自己的指标说明（第 6 课）。</li></ol><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section><section class="lab" id="lab7"><h3>实验 7　选做：混合架构的状态管理</h3><div class="goal"><b>目标：</b>体验第 7 节讲的“KV + 状态”：线性 attention 层的固定大小状态，以及按检查点做前缀缓存。</div><h4>要做的事</h4><ol><li>写一个简化的线性 attention 层（递归形式：每来一个 token 更新一次固定大小的状态），可以用随机权重的玩具模型。</li><li>状态管理：每个请求一个固定槽位，和实验 2 的分页 KV 并存。</li><li>检查点式前缀缓存：每 N 个 token 保存一次状态快照，命中时从最近的检查点继续。</li></ol><h4>完成标准</h4><ul><li>相同前缀的请求能从检查点继续，省掉对应的 prefill。</li><li>画出检查点间隔 N 对命中率和显存占用的影响。</li></ul><h4>思考题</h4><ol><li>为什么状态不能像 KV 一样“截掉后面的就退回到更短前缀”？</li><li>检查点间隔取多大合适？和第 7.3 节 Qwen3-Next 的估算（一个检查点约等于 1,600 个 token 的 KV）对照。</li></ol><h4>参考</h4><ul class="reading"><li><a href="https://docs.vllm.ai/en/latest/design/hybrid_kv_cache_manager/">vLLM：Hybrid KV Cache Manager</a>：按层类型分配缓存、按层定前缀命中规则</li><li><a href="https://arxiv.org/abs/2411.19379">Marconi（MLSys 2025）</a>：混合模型的前缀缓存：检查点存在哪里、留哪些</li><li><a href="https://pytorch.org/blog/hybrid-models-meet-sglang-more-than-full-attention/">Hybrid Models Meet SGLang</a>：SGLang 支持 Mamba / 线性 attention 混合模型的做法</li></ul><p class="todo-later">逐步的代码框架和讲解，会在做到这个实验时补充。</p></section></section><section id="faq"><h2>常见问题</h2><ul>
 <li><b><code>torch.cuda.is_available()</code> 返回 False</b>：依次检查 GPU 访问权限（udev 方式看 <code>ls -l /dev/kfd /dev/dri/renderD*</code> 是否显示 crw-rw-rw-；加组方式看 <code>groups</code> 里有没有 render 和 video，加组后要重启）；<code>dkms status</code> 里 amdgpu 是不是 installed；<code>rocminfo</code> 能不能看到 gfx1101；<code>pip show torch</code> 的版本号是否带 <code>+rocm10.1.0</code>，而不是 PyPI 上的普通版。</li>
 <li><b>udev 规则没生效（显示 crw-rw----）</b>：检查规则文件里的引号是不是英文直引号，再执行 <code>sudo udevadm control --reload-rules</code> 和 <code>sudo udevadm trigger</code>，或者直接重启。</li>
 <li><b>pip 报 externally-managed-environment</b>：Ubuntu 26.04 的系统 Python 受 PEP 668 保护。先 <code>source ~/venvs/llm/bin/activate</code> 再装。</li>
-<li><b>为什么选 PyTorch 2.14.0</b>：AMD 的已知问题写明，PyTorch 2.14 之前，RX 7900 系列、RX 7800 XT 等显卡上部分 LLM 推理负载（包括 batch 不小于 8 的 vLLM FP16 decode）性能偏低，临时办法是设 <code>TORCH_BLAS_PREFER_HIPBLASLT=1</code>；从 2.14 起这是这些显卡的默认设置。如果别的工具要求 2.13，记得设这个环境变量。</li>
+<li><b>为什么选 PyTorch 2.14.0</b>：AMD 的已知问题写明，PyTorch 2.14 之前，RX 7900 系列、RX 7800 XT 等显卡上部分 LLM 推理负载（包括 batch 不小于 8 的 vLLM FP16 decode）性能偏低，临时办法是设 <code>TORCH_BLAS_PREFER_HIPBLASLT=1</code>；从 2.14 起这是这些显卡的默认设置。如果别的工具要求 2.13，记得设这个环境变量。不过在 RX 7800 XT 上实测，2.14.0 报告的首选后端仍是 rocBLAS，见实验 0 的“大致预期”。</li>
 <li><b>后装的包把 torch 换掉了</b>：在这个 venv 里装依赖 torch 的包时，pip 可能从 PyPI 拉另一个 torch。装之前先用 <code>pip install --dry-run</code> 看会不会动 torch。</li>
 <li><b>开了 Secure Boot，驱动加载不了</b>：amdgpu-dkms 是 DKMS 编译的内核模块，装的时候留意 MOK 密码提示，重启时选 Enroll MOK。</li>
 <li><b>amdgpu-dkms 编译失败，或升级内核后驱动没了</b>：先装当前内核的头文件 <code>sudo apt install "linux-headers-$(uname -r)"</code>，再重装 amdgpu-dkms。</li>
@@ -425,7 +659,7 @@ logits = rmsnorm(x, norm) @ embed_tokens.T    # lm_head 与 embedding 共享</pr
 <li><b>看磁盘占用</b>：<code>du -sh /opt/rocm/core-10.1 ~/venvs ~/.cache/huggingface</code> 看 ROCm、Python 环境和模型各占多少；<code>docker system df</code> 看 Docker 镜像。</li>
 <li><b>显存不够</b>：先用 Qwen3-0.6B，缩短最大长度、减小 batch。</li>
 <li><b>Qwen3 默认开着思考模式</b>：做速度测试时直接喂原始文本即可，不必套聊天模板。模型卡提醒思考模式下贪心解码容易无限重复，这不影响测速，但看输出质量时要换成推荐的采样参数。</li>
-</ul></section><section id="refs"><h2>参考资料</h2><h3 class="grp">环境</h3><ul class="reading"><li><a href="https://rocm.docs.amd.com/en/docs-10.1.0/install/rocm.html?fam=all&amp;w=compute&amp;os=ubuntu&amp;ubuntu-ver=26.04.1&amp;i=pkgman">AMD：Install AMD ROCm 10.1.0（Ubuntu 26.04.1，apt）</a>：前置条件、GPU 权限、软件源、元包、安装后检查、卸载</li><li><a href="https://rocm.docs.amd.com/en/docs-10.1.0/compatibility/compatibility-matrix.html">AMD：ROCm 10.1.0 兼容性矩阵</a>：支持的显卡、系统和内核、驱动版本，以及 PyTorch、vLLM 等框架的版本</li><li><a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/docs-31.60.0/install/detailed-install/prerequisites.html">AMD GPU Driver 31.60.0：安装前提</a>：系统和内核版本检查、内核头文件</li><li><a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/docs-31.60.0/install/detailed-install/package-manager/package-manager-ubuntu.html">AMD GPU Driver 31.60.0：Ubuntu 原生安装</a>：驱动软件源、amdgpu-dkms 的安装和卸载</li><li><a href="https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/frameworks/pytorch/install.html">AMD：Install PyTorch for ROCm</a>：pip 和 Docker 两种装法、已知问题；页面上依次选 ROCm 10.1.0、Radeon、RX 7800 XT、Linux、pip</li><li><a href="https://www.techpowerup.com/gpu-specs/amd-radeon-rx-7800-xt.b11417">TechPowerUp：RX 7800 XT 规格</a>：带宽、算力、缓存等参数</li></ul><h3 class="grp">模型与参考实现</h3><ul class="reading"><li><a href="https://huggingface.co/Qwen/Qwen3-0.6B">Qwen3-0.6B 模型卡</a>：模型说明、思考模式开关、推荐的采样参数</li><li><a href="https://github.com/GeeeekExplorer/nano-vllm">nano-vllm</a>：约 1,200 行 Python 的 vLLM 简化实现，调度器、block manager、前缀缓存都很短</li><li><a href="https://github.com/sgl-project/mini-sglang">mini-sglang</a>：约 5,000 行的 SGLang 简化实现（radix cache、overlap scheduling、TP），只支持 Linux + NVIDIA</li><li><a href="https://github.com/pzsacc/nano-vllm-lite/blob/main/README.en.md">nano-vllm-lite</a>：在 nano-vllm 基础上加了 CUDA Graph、chunked prefill、FP8 KV cache，每项优化都有实测数据</li><li><a href="https://skyzh.github.io/tiny-llm/">tiny-llm</a>：基于 MLX 的“一周写一个推理服务”课程，可作为章节安排的参考</li><li><a href="https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file">FlashAttention</a>：README 里有 ROCm 支持说明：Triton 后端支持 RDNA，分页 attention 仍在开发</li></ul><h3 class="grp">实验 7 用</h3><ul class="reading"><li><a href="https://docs.vllm.ai/en/latest/design/hybrid_kv_cache_manager/">vLLM：Hybrid KV Cache Manager</a>：按层类型分配缓存、按层定前缀命中规则</li><li><a href="https://arxiv.org/abs/2411.19379">Marconi（MLSys 2025）</a>：混合模型的前缀缓存：检查点存在哪里、留哪些</li><li><a href="https://pytorch.org/blog/hybrid-models-meet-sglang-more-than-full-attention/">Hybrid Models Meet SGLang</a>：SGLang 支持 Mamba / 线性 attention 混合模型的做法</li></ul></section></main><footer>根据 2026 年 10 月 29–30 日的对话整理。安装命令和版本号来自 AMD 官方文档（ROCm 10.1.0、AMD GPU Driver 31.60.0），以后升级时以官方文档为准。</footer>
+</ul></section><section id="refs"><h2>参考资料</h2><h3 class="grp">环境</h3><ul class="reading"><li><a href="https://rocm.docs.amd.com/en/docs-10.1.0/install/rocm.html?fam=all&amp;w=compute&amp;os=ubuntu&amp;ubuntu-ver=26.04.1&amp;i=pkgman">AMD：Install AMD ROCm 10.1.0（Ubuntu 26.04.1，apt）</a>：前置条件、GPU 权限、软件源、元包、安装后检查、卸载</li><li><a href="https://rocm.docs.amd.com/en/docs-10.1.0/compatibility/compatibility-matrix.html">AMD：ROCm 10.1.0 兼容性矩阵</a>：支持的显卡、系统和内核、驱动版本，以及 PyTorch、vLLM 等框架的版本</li><li><a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/docs-31.60.0/install/detailed-install/prerequisites.html">AMD GPU Driver 31.60.0：安装前提</a>：系统和内核版本检查、内核头文件</li><li><a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/docs-31.60.0/install/detailed-install/package-manager/package-manager-ubuntu.html">AMD GPU Driver 31.60.0：Ubuntu 原生安装</a>：驱动软件源、amdgpu-dkms 的安装和卸载</li><li><a href="https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/frameworks/pytorch/install.html">AMD：Install PyTorch for ROCm</a>：pip 和 Docker 两种装法、已知问题；页面上依次选 ROCm 10.1.0、Radeon、RX 7800 XT、Linux、pip</li><li><a href="https://www.techpowerup.com/gpu-specs/amd-radeon-rx-7800-xt.b11417">TechPowerUp：RX 7800 XT 规格</a>：带宽、算力、缓存等参数</li></ul><h3 class="grp">模型与参考实现</h3><ul class="reading"><li><a href="https://huggingface.co/Qwen/Qwen3-0.6B">Qwen3-0.6B 模型卡</a>：模型说明、思考模式开关、推荐的采样参数</li><li><a href="https://github.com/GeeeekExplorer/nano-vllm">nano-vllm</a>：约 1,200 行 Python 的 vLLM 简化实现，调度器、block manager、前缀缓存都很短</li><li><a href="https://github.com/sgl-project/mini-sglang">mini-sglang</a>：约 5,000 行的 SGLang 简化实现（radix cache、overlap scheduling、TP），只支持 Linux + NVIDIA</li><li><a href="https://github.com/pzsacc/nano-vllm-lite/blob/main/README.en.md">nano-vllm-lite</a>：在 nano-vllm 基础上加了 CUDA Graph、chunked prefill、FP8 KV cache，每项优化都有实测数据</li><li><a href="https://skyzh.github.io/tiny-llm/">tiny-llm</a>：基于 MLX 的“一周写一个推理服务”课程，可作为章节安排的参考</li><li><a href="https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file">FlashAttention</a>：README 里有 ROCm 支持说明：Triton 后端支持 RDNA，分页 attention 仍在开发</li></ul><h3 class="grp">实验 7 用</h3><ul class="reading"><li><a href="https://docs.vllm.ai/en/latest/design/hybrid_kv_cache_manager/">vLLM：Hybrid KV Cache Manager</a>：按层类型分配缓存、按层定前缀命中规则</li><li><a href="https://arxiv.org/abs/2411.19379">Marconi（MLSys 2025）</a>：混合模型的前缀缓存：检查点存在哪里、留哪些</li><li><a href="https://pytorch.org/blog/hybrid-models-meet-sglang-more-than-full-attention/">Hybrid Models Meet SGLang</a>：SGLang 支持 Mamba / 线性 attention 混合模型的做法</li></ul></section></main><footer>根据 2026 年 10 月 29–31 日的对话整理。安装命令和版本号来自 AMD 官方文档（ROCm 10.1.0、AMD GPU Driver 31.60.0），以后升级时以官方文档为准。</footer>
 </div>
 </body>
 </html>
